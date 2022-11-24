@@ -8,14 +8,14 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams v0.0.22-0.20221114180215-45c1bb1d4804
+	github.com/streamingfast/substreams v0.0.22-0.20221124192438-6ef4954ac865
 	go.uber.org/zap v1.21.0
 )
 
 require (
 	github.com/jhump/protoreflect v1.12.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
-	github.com/streamingfast/dstore v0.1.1-0.20221025062403-36259703e97b // indirect
+	github.com/streamingfast/dstore v0.1.1-0.20221118114203-13f4092e3bf0 // indirect
 )
 
 require (

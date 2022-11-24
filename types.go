@@ -2,6 +2,7 @@ package sink
 
 import (
 	"context"
+
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -24,3 +25,13 @@ func NewBlankCursor() *Cursor {
 func (c *Cursor) IsBlank() bool {
 	return c.Cursor == ""
 }
+
+//go:generate go-enum -f=$GOFILE --marshal --names
+
+// ENUM(
+//
+//	Development
+//	Production
+//
+// )
+type SubstreamsMode uint
