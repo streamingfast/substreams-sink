@@ -26,7 +26,7 @@ type Sinker struct {
 	clientConfig          *client.SubstreamsClientConfig
 	modules               *pbsubstreams.Modules
 	outputModule          *pbsubstreams.Module
-	substreamsMode        SubstreamsMode
+	mode                  SubstreamsMode
 	outputModuleHash      string
 	stats                 *Stats
 	blockScopeDataHandler BlockScopeDataHandler
@@ -36,9 +36,9 @@ type Sinker struct {
 }
 
 func New(
+	mode SubstreamsMode,
 	modules *pbsubstreams.Modules,
 	outputModule *pbsubstreams.Module,
-	substreamsMode SubstreamsMode,
 	hash manifest.ModuleHash,
 	h BlockScopeDataHandler,
 	clientConfig *client.SubstreamsClientConfig,
@@ -51,7 +51,7 @@ func New(
 		modules:               modules,
 		outputModule:          outputModule,
 		outputModuleHash:      hex.EncodeToString(hash),
-		substreamsMode:        substreamsMode,
+		mode:                  mode,
 		blockScopeDataHandler: h,
 		stats:                 newStats(logger),
 		logger:                logger,
@@ -98,7 +98,7 @@ func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cur
 			ForkSteps:      []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 			Modules:        s.modules,
 			OutputModules:  []string{s.outputModule.Name},
-			ProductionMode: s.substreamsMode == SubstreamsModeProduction,
+			ProductionMode: s.mode == SubstreamsModeProduction,
 		}
 
 		activeCursor, err = s.doRequest(ctx, activeCursor, req, ssClient, callOpts)
