@@ -66,7 +66,13 @@ func (s *Sinker) Start(ctx context.Context, blockRange *bstream.Range, cursor *C
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
 	s.stats.Start(2 * time.Second)
 
-	return s.run(ctx, blockRange, cursor)
+	var err error
+	defer func() {
+		s.Shutdown(err)
+	}()
+
+	err = s.run(ctx, blockRange, cursor)
+	return err
 }
 
 func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cursor) (err error) {
