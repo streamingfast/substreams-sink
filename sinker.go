@@ -158,7 +158,6 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreams.Response_Progress:
-
 			for _, module := range r.Progress.Modules {
 				progressMessageCount++
 				ProgressMessageCount.Inc(module.Name)
@@ -179,7 +178,6 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 			activeCursor = cursor
 			s.stats.RecordBlock(block)
 			BlockCount.AddInt(1)
-
 		default:
 			s.logger.Error("received unknown type of message")
 		}
