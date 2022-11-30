@@ -1,6 +1,6 @@
 ## Substreams Sink
 
-This is a substreams client library. You can use to build any application that consumes Substreams in Golang
+This is a Substreams Sink library. You can use to build any sink application that consumes Substreams in Golang
 
 ### Features
 What you get by using this library:

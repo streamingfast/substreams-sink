@@ -31,8 +31,9 @@ type Sinker struct {
 	stats                 *Stats
 	blockScopeDataHandler BlockScopeDataHandler
 
-	logger *zap.Logger
-	tracer logging.Tracer
+	logger    *zap.Logger
+	tracer    logging.Tracer
+	forkSteps []pbsubstreams.ForkStep
 }
 
 func New(
@@ -42,6 +43,7 @@ func New(
 	hash manifest.ModuleHash,
 	h BlockScopeDataHandler,
 	clientConfig *client.SubstreamsClientConfig,
+	forkSteps []pbsubstreams.ForkStep,
 	logger *zap.Logger,
 	tracer logging.Tracer,
 ) (*Sinker, error) {
@@ -54,6 +56,7 @@ func New(
 		mode:                  mode,
 		blockScopeDataHandler: h,
 		stats:                 newStats(logger),
+		forkSteps:             forkSteps,
 		logger:                logger,
 		tracer:                tracer,
 	}
@@ -101,7 +104,7 @@ func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cur
 			StartBlockNum:  int64(startBlock),
 			StopBlockNum:   stopBlock,
 			StartCursor:    activeCursor.Cursor,
-			ForkSteps:      []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
+			ForkSteps:      s.forkSteps,
 			Modules:        s.modules,
 			OutputModules:  []string{s.outputModule.Name},
 			ProductionMode: s.mode == SubstreamsModeProduction,
