@@ -1,6 +1,13 @@
 ## Substreams Sink
 
-This is a general purpose library used to help with the creation of specialized sinks for Substreams which save the output data to some kind of storage (eg: redis, mongodb, json files, etc). It is not intended to be used directly, but rather as a dependency for other libraries.
+This is a substreams client library. You can use to build any application that consumes Substreams in Golang
+
+### Features
+What you get by using this library:
+
+- Handles connection and reconnections
+- Throughput Logging (block rates, etc)
+- Best Practise error handling
 
 ### Usage
 
@@ -27,7 +34,7 @@ type BlockScopedData struct {
 > note: pbsubstreams is the common alias for the `github.com/streamingfast/substreams/pb/sf/substreams/v1` package found [here](https://github.com/streamingfast/substreams/tree/develop/pb/sf/substreams/v1).
 
 
-The `BlockScopeDataHandler` is called for each data message that is received from the Substreams API and contains all the data output for the given substreams module.
+The `BlockScopeDataHandler` is called for each block scoped data message that is received from the Substreams API and contains all the data output for the given substreams module.
 
 The `BlockScopeDataHandler` is responsible for decoding and processing the data, and returning an error if there is a problem. The `BlockScopeDataHandler` is also responsible for storing the cursor to the last processed block number. 
 
