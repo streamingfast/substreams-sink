@@ -54,7 +54,9 @@ func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error
 		blocks := b.data[:ix]
 		b.data = b.data[ix:]
 		b.irrIdx = 0
-		b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
+		if len(blocks) > 0 {
+			b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
+		}
 
 		return blocks, nil
 	} else if b.irrIdx != 0 {
@@ -62,7 +64,9 @@ func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error
 		b.data = b.data[b.irrIdx:]
 		b.irrIdx = 0
 
-		b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
+		if len(blocks) > 0 {
+			b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
+		}
 		return blocks, nil
 	}
 
