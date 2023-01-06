@@ -1,28 +1,31 @@
 package sink
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type BlockDataBuffer struct {
-	size   int
-	irrIdx int
-	data   []*pbsubstreams.BlockScopedData
+type blockDataBuffer struct {
+	size              int
+	irrIdx            int
+	lastBlockReturned uint64
+
+	data []*pbsubstreams.BlockScopedData
 
 	mu sync.RWMutex
 }
 
-func NewBlockDataBuffer(size int) *BlockDataBuffer {
-	return &BlockDataBuffer{
+func newBlockDataBuffer(size int) *blockDataBuffer {
+	return &blockDataBuffer{
 		size: size,
 		data: make([]*pbsubstreams.BlockScopedData, 0, size),
 	}
 }
 
-func (b *BlockDataBuffer) AddBlockData(blockData *pbsubstreams.BlockScopedData) error {
+func (b *blockDataBuffer) AddBlockData(blockData *pbsubstreams.BlockScopedData) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -38,7 +41,7 @@ func (b *BlockDataBuffer) AddBlockData(blockData *pbsubstreams.BlockScopedData) 
 	return nil
 }
 
-func (b *BlockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error) {
+func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -51,6 +54,7 @@ func (b *BlockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error
 		blocks := b.data[:ix]
 		b.data = b.data[ix:]
 		b.irrIdx = 0
+		b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
 
 		return blocks, nil
 	} else if b.irrIdx != 0 {
@@ -58,15 +62,20 @@ func (b *BlockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error
 		b.data = b.data[b.irrIdx:]
 		b.irrIdx = 0
 
+		b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
 		return blocks, nil
 	}
 
 	return nil, nil
 }
 
-func (b *BlockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) error {
+func (b *blockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) error {
 	if len(b.data) == 0 {
 		return nil
+	}
+
+	if b.lastBlockReturned >= blockData.Clock.Number {
+		return fmt.Errorf("cannot undo block %d, last block returned is %d", blockData.Clock.Number, b.lastBlockReturned)
 	}
 
 	for i := len(b.data) - 1; i >= 0; i-- {
@@ -80,7 +89,7 @@ func (b *BlockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) er
 	return nil
 }
 
-func (b *BlockDataBuffer) handleNew(blockData *pbsubstreams.BlockScopedData) error {
+func (b *blockDataBuffer) handleNew(blockData *pbsubstreams.BlockScopedData) error {
 	b.data = append(b.data, blockData)
 
 	sort.Slice(b.data, func(i, j int) bool {
@@ -90,7 +99,7 @@ func (b *BlockDataBuffer) handleNew(blockData *pbsubstreams.BlockScopedData) err
 	return nil
 }
 
-func (b *BlockDataBuffer) handleIrreversible(blockData *pbsubstreams.BlockScopedData) error {
+func (b *blockDataBuffer) handleIrreversible(blockData *pbsubstreams.BlockScopedData) error {
 	b.data = append(b.data, blockData)
 	b.irrIdx = len(b.data)
 
