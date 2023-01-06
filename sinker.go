@@ -31,9 +31,20 @@ type Sinker struct {
 	stats                 *Stats
 	blockScopeDataHandler BlockScopeDataHandler
 
+	buffer *BlockDataBuffer
+
 	logger    *zap.Logger
 	tracer    logging.Tracer
 	forkSteps []pbsubstreams.ForkStep
+}
+
+type Option func(s *Sinker)
+
+func WithBlockDataBuffer(bufferSize int) Option {
+	return func(s *Sinker) {
+		buffer := NewBlockDataBuffer(bufferSize)
+		s.buffer = buffer
+	}
 }
 
 func New(
@@ -46,6 +57,7 @@ func New(
 	forkSteps []pbsubstreams.ForkStep,
 	logger *zap.Logger,
 	tracer logging.Tracer,
+	opts ...Option,
 ) (*Sinker, error) {
 	s := &Sinker{
 		Shutter:               shutter.New(),
@@ -59,6 +71,10 @@ func New(
 		forkSteps:             forkSteps,
 		logger:                logger,
 		tracer:                tracer,
+	}
+
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	return s, nil
@@ -171,16 +187,29 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 			}
 
 		case *pbsubstreams.Response_Data:
-			block := bstream.NewBlockRef(r.Data.Clock.Id, r.Data.Clock.Number)
-			cursor := NewCursor(r.Data.Cursor, block)
+			var dataToProcess []*pbsubstreams.BlockScopedData
 
-			if err := s.blockScopeDataHandler(ctx, cursor, r.Data); err != nil {
-				return activeCursor, fmt.Errorf("handle block scope data: %w", err)
+			if s.buffer == nil {
+				dataToProcess = []*pbsubstreams.BlockScopedData{r.Data} // no buffering, process directly
+			} else {
+				s.buffer.AddBlockData(r.Data)
+				dataToProcess, err = s.buffer.GetBlockData()
+				if err != nil {
+					return activeCursor, fmt.Errorf("get block data from buffer: %w", err)
+				}
 			}
 
-			activeCursor = cursor
-			s.stats.RecordBlock(block)
-			BlockCount.AddInt(1)
+			for _, blockData := range dataToProcess {
+				block := bstream.NewBlockRef(blockData.Clock.Id, blockData.Clock.Number)
+				cursor := NewCursor(blockData.Cursor, block)
+				if err := s.blockScopeDataHandler(ctx, cursor, blockData); err != nil {
+					return activeCursor, fmt.Errorf("handle block scope data: %w", err)
+				}
+
+				activeCursor = cursor
+				s.stats.RecordBlock(block)
+				BlockCount.AddInt(1)
+			}
 		default:
 			s.logger.Error("received unknown type of message")
 		}
