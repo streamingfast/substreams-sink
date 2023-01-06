@@ -43,7 +43,7 @@ func (b *BlockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error
 	defer b.mu.Unlock()
 
 	if len(b.data) >= b.size {
-		ix := b.size
+		ix := len(b.data) - b.size
 		if b.irrIdx > ix {
 			ix = b.irrIdx
 		}

@@ -65,7 +65,7 @@ func TestBlockBuffer_AddBlock(t *testing.T) {
 				},
 			},
 			args: args{
-				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 2, "2a"),
+				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 3, "3a"),
 			},
 			wantErr: false,
 		},
@@ -108,7 +108,6 @@ func TestBlockBuffer_GetBlocks(t *testing.T) {
 			want: []*pbsubstreams.BlockScopedData{
 				testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
 				testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 2, "2a"),
-				testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 3, "3a"),
 			},
 			wantErr: false,
 		},
