@@ -20,6 +20,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const defaultBlockDataBufferSize = 12
+
 type Sinker struct {
 	*shutter.Shutter
 
@@ -31,7 +33,7 @@ type Sinker struct {
 	stats                 *Stats
 	blockScopeDataHandler BlockScopeDataHandler
 
-	buffer *BlockDataBuffer
+	buffer *blockDataBuffer
 
 	logger    *zap.Logger
 	tracer    logging.Tracer
@@ -40,9 +42,17 @@ type Sinker struct {
 
 type Option func(s *Sinker)
 
+// WithBlockDataBuffer creates a buffer of block data which is used to handle undo fork steps.
+//
+// Ensure that this buffer is large enough to capture all block reorganizations.
+// If the buffer is too small, the sinker will not be able to handle the reorganization and will error if an undo is received for a block which has already been returned to the sink.
+// If the buffer is too large, the sinker will take more time than necessary to write data to the sink.
+//
+// If the sink is configured to handle irreversible blocks, the default buffer size is 12.
+// If the sink is not configured to handle undo fork steps, the buffer is not used.
 func WithBlockDataBuffer(bufferSize int) Option {
 	return func(s *Sinker) {
-		buffer := NewBlockDataBuffer(bufferSize)
+		buffer := newBlockDataBuffer(bufferSize)
 		s.buffer = buffer
 	}
 }
@@ -75,6 +85,11 @@ func New(
 
 	for _, opt := range opts {
 		opt(s)
+	}
+
+	if s.buffer == nil && stepsContainUndo(s.forkSteps) {
+		logger.Info("no block data buffer provided. since undo steps are possible, using default buffer size", zap.Int("size", defaultBlockDataBufferSize))
+		s.buffer = newBlockDataBuffer(defaultBlockDataBufferSize)
 	}
 
 	return s, nil
@@ -192,7 +207,11 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 			if s.buffer == nil {
 				dataToProcess = []*pbsubstreams.BlockScopedData{r.Data} // no buffering, process directly
 			} else {
-				s.buffer.AddBlockData(r.Data)
+				err = s.buffer.AddBlockData(r.Data)
+				if err != nil {
+					return activeCursor, fmt.Errorf("buffer add block data: %w", err)
+				}
+
 				dataToProcess, err = s.buffer.GetBlockData()
 				if err != nil {
 					return activeCursor, fmt.Errorf("get block data from buffer: %w", err)
@@ -215,4 +234,13 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 		}
 
 	}
+}
+
+func stepsContainUndo(forkSteps []pbsubstreams.ForkStep) bool {
+	for _, step := range forkSteps {
+		if step == pbsubstreams.ForkStep_STEP_UNDO {
+			return true
+		}
+	}
+	return false
 }
