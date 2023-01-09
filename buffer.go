@@ -38,12 +38,14 @@ func (b *blockDataBuffer) AddBlockData(blockData *pbsubstreams.BlockScopedData) 
 		return b.handleUndo(blockData)
 	}
 
-	return nil
+	return fmt.Errorf("unknown fork step %s", blockData.Step)
 }
 
 func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	var blocks []*pbsubstreams.BlockScopedData
 
 	if len(b.data) >= b.size {
 		ix := len(b.data) - b.size
@@ -51,26 +53,19 @@ func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error
 			ix = b.irrIdx
 		}
 
-		blocks := b.data[:ix]
+		blocks = b.data[:ix]
 		b.data = b.data[ix:]
 		b.irrIdx = 0
-		if len(blocks) > 0 {
-			b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
-		}
-
-		return blocks, nil
 	} else if b.irrIdx != 0 {
-		blocks := b.data[0:b.irrIdx]
+		blocks = b.data[0:b.irrIdx]
 		b.data = b.data[b.irrIdx:]
 		b.irrIdx = 0
-
-		if len(blocks) > 0 {
-			b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
-		}
-		return blocks, nil
 	}
 
-	return nil, nil
+	if len(blocks) > 0 {
+		b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
+	}
+	return blocks, nil
 }
 
 func (b *blockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) error {

@@ -69,6 +69,19 @@ func TestBlockBuffer_AddBlock(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "add unknown step block",
+			fields: fields{
+				size: 10,
+				blocks: []*pbsubstreams.BlockScopedData{
+					testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
+				},
+			},
+			args: args{
+				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_UNKNOWN, 2, "2a"),
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
