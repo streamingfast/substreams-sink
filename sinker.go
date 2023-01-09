@@ -242,8 +242,10 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 				s.stats.RecordBlock(block)
 				BlockCount.AddInt(1)
 			}
+		case *pbsubstreams.Response_Session:
+			s.logger.Info("session init", zap.String("trace_id", r.Session.TraceId))
 		default:
-			s.logger.Error("received unknown type of message")
+			s.logger.Info("received unknown type of message", zap.Reflect("message", r))
 		}
 
 	}
