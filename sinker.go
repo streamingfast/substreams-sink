@@ -110,6 +110,12 @@ func (s *Sinker) Start(ctx context.Context, blockRange *bstream.Range, cursor *C
 }
 
 func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cursor) (err error) {
+	if s.buffer != nil {
+		endBlockNum := new(uint64)
+		*endBlockNum = *(blockRange.EndBlock()) + uint64(s.buffer.size)
+		blockRange = bstream.NewRange(blockRange.StartBlock(), endBlockNum, bstream.WithExclusiveEnd())
+	}
+
 	activeCursor := cursor
 	if s.blockScopeDataHandler == nil {
 		return fmt.Errorf("block scope data hanlder not set")
@@ -187,6 +193,10 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 
 		resp, err := stream.Recv()
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return activeCursor, err
+			}
+
 			return activeCursor, fmt.Errorf("receive stream next message: %w", err)
 		}
 
@@ -207,6 +217,10 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 			if s.buffer == nil {
 				dataToProcess = []*pbsubstreams.BlockScopedData{r.Data} // no buffering, process directly
 			} else {
+				block := bstream.NewBlockRef(r.Data.Clock.Id, r.Data.Clock.Number)
+				cursor := NewCursor(r.Data.Cursor, block)
+				activeCursor = cursor
+
 				err = s.buffer.AddBlockData(r.Data)
 				if err != nil {
 					return activeCursor, fmt.Errorf("buffer add block data: %w", err)
@@ -220,12 +234,11 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 
 			for _, blockData := range dataToProcess {
 				block := bstream.NewBlockRef(blockData.Clock.Id, blockData.Clock.Number)
-				cursor := NewCursor(blockData.Cursor, block)
-				if err := s.blockScopeDataHandler(ctx, cursor, blockData); err != nil {
+				currentCursor := NewCursor(blockData.Cursor, block)
+				if err := s.blockScopeDataHandler(ctx, currentCursor, blockData); err != nil {
 					return activeCursor, fmt.Errorf("handle block scope data: %w", err)
 				}
 
-				activeCursor = cursor
 				s.stats.RecordBlock(block)
 				BlockCount.AddInt(1)
 			}
