@@ -300,6 +300,7 @@ func TestBlockBuffer_HandleNew(t *testing.T) {
 	type fields struct {
 		size   int
 		blocks []*pbsubstreams.BlockScopedData
+		index  map[bufferKey]bool
 	}
 	type args struct {
 		block *pbsubstreams.BlockScopedData
@@ -317,6 +318,7 @@ func TestBlockBuffer_HandleNew(t *testing.T) {
 				blocks: []*pbsubstreams.BlockScopedData{
 					testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
 				},
+				index: map[bufferKey]bool{},
 			},
 			args: args{
 				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 2, "pp"),
@@ -326,11 +328,30 @@ func TestBlockBuffer_HandleNew(t *testing.T) {
 				testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 2, "pp"),
 			},
 		},
+		{
+			name: "add already existing block",
+			fields: fields{
+				size: 10,
+				blocks: []*pbsubstreams.BlockScopedData{
+					testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
+				},
+				index: map[bufferKey]bool{
+					newBufferKey(1, "1a", pbsubstreams.ForkStep_STEP_NEW): true,
+				},
+			},
+			args: args{
+				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
+			},
+			want: []*pbsubstreams.BlockScopedData{
+				testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := newBlockDataBuffer(tt.fields.size)
 			b.data = tt.fields.blocks
+			b.index = tt.fields.index
 			b.handleNew(tt.args.block)
 			if len(b.data) != len(tt.want) {
 				t.Errorf("blockDataBuffer.HandleNew() = %v, want %v", b.data, tt.want)
@@ -343,6 +364,7 @@ func TestBlockDataBuffer_HandleIrreversible(t *testing.T) {
 	type fields struct {
 		size   int
 		blocks []*pbsubstreams.BlockScopedData
+		index  map[bufferKey]bool
 	}
 	type args struct {
 		block *pbsubstreams.BlockScopedData
@@ -359,6 +381,7 @@ func TestBlockDataBuffer_HandleIrreversible(t *testing.T) {
 			fields: fields{
 				size:   10,
 				blocks: []*pbsubstreams.BlockScopedData{},
+				index:  map[bufferKey]bool{},
 			},
 			args: args{
 				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 1, "1a"),
@@ -377,6 +400,7 @@ func TestBlockDataBuffer_HandleIrreversible(t *testing.T) {
 					testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 2, "2a"),
 					testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 3, "3a"),
 				},
+				index: map[bufferKey]bool{},
 			},
 			args: args{
 				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 4, "4a"),
@@ -389,11 +413,30 @@ func TestBlockDataBuffer_HandleIrreversible(t *testing.T) {
 				testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 4, "4a"),
 			},
 		},
+		{
+			name: "add already existing block",
+			fields: fields{
+				size: 10,
+				blocks: []*pbsubstreams.BlockScopedData{
+					testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 1, "1a"),
+				},
+				index: map[bufferKey]bool{
+					newBufferKey(1, "1a", pbsubstreams.ForkStep_STEP_IRREVERSIBLE): true,
+				},
+			},
+			args: args{
+				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 1, "1a"),
+			},
+			want: []*pbsubstreams.BlockScopedData{
+				testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 1, "1a"),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := newBlockDataBuffer(tt.fields.size)
 			b.data = tt.fields.blocks
+			b.index = tt.fields.index
 			b.handleIrreversible(tt.args.block)
 			if len(b.data) != len(tt.want) {
 				t.Errorf("blockDataBuffer.HandleIrreversible() = %v, want %v", b.data, tt.want)

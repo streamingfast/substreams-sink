@@ -8,10 +8,19 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+type bufferKey string
+
+func newBufferKey(blockNum uint64, blockId string, forkStep pbsubstreams.ForkStep) bufferKey {
+	return bufferKey(fmt.Sprintf("%d-%s-%s", blockNum, blockId, forkStep))
+}
+
 type blockDataBuffer struct {
 	size              int
 	irrIdx            int
 	lastBlockReturned uint64
+	stopBlock         uint64
+
+	index map[bufferKey]bool
 
 	data []*pbsubstreams.BlockScopedData
 
@@ -20,8 +29,9 @@ type blockDataBuffer struct {
 
 func newBlockDataBuffer(size int) *blockDataBuffer {
 	return &blockDataBuffer{
-		size: size,
-		data: make([]*pbsubstreams.BlockScopedData, 0, size),
+		size:  size,
+		index: make(map[bufferKey]bool),
+		data:  make([]*pbsubstreams.BlockScopedData, 0, size),
 	}
 }
 
@@ -79,6 +89,8 @@ func (b *blockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) er
 
 	for i := len(b.data) - 1; i >= 0; i-- {
 		if b.data[i].Clock.Number >= blockData.Clock.Number {
+			k := newBufferKey(b.data[i].Clock.Number, b.data[i].Clock.Id, b.data[i].Step)
+			delete(b.index, k)
 			b.data = b.data[0:i]
 		} else {
 			break
@@ -89,7 +101,13 @@ func (b *blockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) er
 }
 
 func (b *blockDataBuffer) handleNew(blockData *pbsubstreams.BlockScopedData) error {
+	k := newBufferKey(blockData.Clock.Number, blockData.Clock.Id, blockData.Step)
+	if _, ok := b.index[k]; ok {
+		return nil
+	}
+
 	b.data = append(b.data, blockData)
+	b.index[k] = true
 
 	sort.Slice(b.data, func(i, j int) bool {
 		return b.data[i].Clock.Number < b.data[j].Clock.Number
@@ -99,8 +117,14 @@ func (b *blockDataBuffer) handleNew(blockData *pbsubstreams.BlockScopedData) err
 }
 
 func (b *blockDataBuffer) handleIrreversible(blockData *pbsubstreams.BlockScopedData) error {
+	k := newBufferKey(blockData.Clock.Number, blockData.Clock.Id, blockData.Step)
+	if _, ok := b.index[k]; ok {
+		return nil
+	}
+
 	b.data = append(b.data, blockData)
 	b.irrIdx = len(b.data)
+	b.index[k] = true
 
 	sort.Slice(b.data, func(i, j int) bool {
 		return b.data[i].Clock.Number < b.data[j].Clock.Number
