@@ -74,6 +74,12 @@ func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error
 
 	if len(blocks) > 0 {
 		b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
+		go func() {
+			for _, blk := range blocks {
+				k := newBufferKey(blk.Clock.Number, blk.Clock.Id, blk.Step)
+				delete(b.index, k)
+			}
+		}()
 	}
 	return blocks, nil
 }
