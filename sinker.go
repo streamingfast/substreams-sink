@@ -110,10 +110,12 @@ func (s *Sinker) Start(ctx context.Context, blockRange *bstream.Range, cursor *C
 }
 
 func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cursor) (err error) {
-	if s.buffer != nil {
-		endBlockNum := new(uint64)
-		*endBlockNum = *(blockRange.EndBlock()) + uint64(s.buffer.size)
-		blockRange = bstream.NewRange(blockRange.StartBlock(), endBlockNum, bstream.WithExclusiveEnd())
+	if s.buffer != nil && blockRange != nil {
+		if blockRange.EndBlock() != nil {
+			endBlockNum := new(uint64)
+			*endBlockNum = *(blockRange.EndBlock()) + uint64(s.buffer.size)
+			blockRange = bstream.NewRange(blockRange.StartBlock(), endBlockNum, bstream.WithExclusiveEnd())
+		}
 	}
 
 	activeCursor := cursor
