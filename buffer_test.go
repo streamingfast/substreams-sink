@@ -300,7 +300,7 @@ func TestBlockBuffer_HandleNew(t *testing.T) {
 	type fields struct {
 		size   int
 		blocks []*pbsubstreams.BlockScopedData
-		index  map[bufferKey]bool
+		index  *dataIndex
 	}
 	type args struct {
 		block *pbsubstreams.BlockScopedData
@@ -318,7 +318,7 @@ func TestBlockBuffer_HandleNew(t *testing.T) {
 				blocks: []*pbsubstreams.BlockScopedData{
 					testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
 				},
-				index: map[bufferKey]bool{},
+				index: newDataIndexWithKeys(),
 			},
 			args: args{
 				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 2, "pp"),
@@ -335,9 +335,9 @@ func TestBlockBuffer_HandleNew(t *testing.T) {
 				blocks: []*pbsubstreams.BlockScopedData{
 					testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
 				},
-				index: map[bufferKey]bool{
-					newBufferKey(1, "1a", pbsubstreams.ForkStep_STEP_NEW): true,
-				},
+				index: newDataIndexWithKeys(
+					newBufferKey(1, "1a", pbsubstreams.ForkStep_STEP_NEW),
+				),
 			},
 			args: args{
 				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_NEW, 1, "1a"),
@@ -364,7 +364,7 @@ func TestBlockDataBuffer_HandleIrreversible(t *testing.T) {
 	type fields struct {
 		size   int
 		blocks []*pbsubstreams.BlockScopedData
-		index  map[bufferKey]bool
+		index  *dataIndex
 	}
 	type args struct {
 		block *pbsubstreams.BlockScopedData
@@ -381,7 +381,7 @@ func TestBlockDataBuffer_HandleIrreversible(t *testing.T) {
 			fields: fields{
 				size:   10,
 				blocks: []*pbsubstreams.BlockScopedData{},
-				index:  map[bufferKey]bool{},
+				index:  newDataIndexWithKeys(),
 			},
 			args: args{
 				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 1, "1a"),
@@ -400,7 +400,7 @@ func TestBlockDataBuffer_HandleIrreversible(t *testing.T) {
 					testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 2, "2a"),
 					testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 3, "3a"),
 				},
-				index: map[bufferKey]bool{},
+				index: newDataIndexWithKeys(),
 			},
 			args: args{
 				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 4, "4a"),
@@ -420,9 +420,9 @@ func TestBlockDataBuffer_HandleIrreversible(t *testing.T) {
 				blocks: []*pbsubstreams.BlockScopedData{
 					testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 1, "1a"),
 				},
-				index: map[bufferKey]bool{
-					newBufferKey(1, "1a", pbsubstreams.ForkStep_STEP_IRREVERSIBLE): true,
-				},
+				index: newDataIndexWithKeys(
+					newBufferKey(1, "1a", pbsubstreams.ForkStep_STEP_IRREVERSIBLE),
+				),
 			},
 			args: args{
 				block: testBlockScopedData(pbsubstreams.ForkStep_STEP_IRREVERSIBLE, 1, "1a"),

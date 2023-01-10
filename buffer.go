@@ -20,7 +20,7 @@ type blockDataBuffer struct {
 	lastBlockReturned uint64
 	stopBlock         uint64
 
-	index map[bufferKey]bool
+	index *dataIndex
 
 	data []*pbsubstreams.BlockScopedData
 
@@ -30,7 +30,7 @@ type blockDataBuffer struct {
 func newBlockDataBuffer(size int) *blockDataBuffer {
 	return &blockDataBuffer{
 		size:  size,
-		index: make(map[bufferKey]bool),
+		index: newDataIndex(),
 		data:  make([]*pbsubstreams.BlockScopedData, 0, size),
 	}
 }
@@ -74,10 +74,12 @@ func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error
 
 	if len(blocks) > 0 {
 		b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
+		keysToDelete := make([]bufferKey, 0, len(blocks))
 		for _, blk := range blocks {
 			k := newBufferKey(blk.Clock.Number, blk.Clock.Id, blk.Step)
-			delete(b.index, k)
+			keysToDelete = append(keysToDelete, k)
 		}
+		b.index.DeleteMany(keysToDelete...)
 	}
 	return blocks, nil
 }
@@ -94,7 +96,8 @@ func (b *blockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) er
 	for i := len(b.data) - 1; i >= 0; i-- {
 		if b.data[i].Clock.Number >= blockData.Clock.Number {
 			k := newBufferKey(b.data[i].Clock.Number, b.data[i].Clock.Id, b.data[i].Step)
-			delete(b.index, k)
+			b.index.Delete(k)
+
 			b.data = b.data[0:i]
 		} else {
 			break
@@ -106,12 +109,12 @@ func (b *blockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) er
 
 func (b *blockDataBuffer) handleNew(blockData *pbsubstreams.BlockScopedData) error {
 	k := newBufferKey(blockData.Clock.Number, blockData.Clock.Id, blockData.Step)
-	if _, ok := b.index[k]; ok {
+	if b.index.Exists(k) {
 		return nil
 	}
 
 	b.data = append(b.data, blockData)
-	b.index[k] = true
+	b.index.Set(k)
 
 	sort.Slice(b.data, func(i, j int) bool {
 		return b.data[i].Clock.Number < b.data[j].Clock.Number
@@ -122,17 +125,68 @@ func (b *blockDataBuffer) handleNew(blockData *pbsubstreams.BlockScopedData) err
 
 func (b *blockDataBuffer) handleIrreversible(blockData *pbsubstreams.BlockScopedData) error {
 	k := newBufferKey(blockData.Clock.Number, blockData.Clock.Id, blockData.Step)
-	if _, ok := b.index[k]; ok {
+	if b.index.Exists(k) {
 		return nil
 	}
 
 	b.data = append(b.data, blockData)
 	b.irrIdx = len(b.data)
-	b.index[k] = true
+	b.index.Set(k)
 
 	sort.Slice(b.data, func(i, j int) bool {
 		return b.data[i].Clock.Number < b.data[j].Clock.Number
 	})
 
 	return nil
+}
+
+type dataIndex struct {
+	ix map[bufferKey]bool
+
+	mu sync.RWMutex
+}
+
+func newDataIndex() *dataIndex {
+	return &dataIndex{
+		ix: make(map[bufferKey]bool),
+	}
+}
+
+func newDataIndexWithKeys(keys ...bufferKey) *dataIndex {
+	ix := newDataIndex()
+	for _, k := range keys {
+		ix.Set(k)
+	}
+	return ix
+}
+
+func (i *dataIndex) Exists(key bufferKey) bool {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+
+	_, ok := i.ix[key]
+	return ok
+}
+
+func (i *dataIndex) Set(key bufferKey) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	i.ix[key] = true
+}
+
+func (i *dataIndex) Delete(key bufferKey) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	delete(i.ix, key)
+}
+
+func (i *dataIndex) DeleteMany(keys ...bufferKey) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	for _, k := range keys {
+		delete(i.ix, k)
+	}
 }
