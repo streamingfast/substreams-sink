@@ -33,7 +33,9 @@ type Sinker struct {
 	stats                 *Stats
 	blockScopeDataHandler BlockScopeDataHandler
 
-	buffer *blockDataBuffer
+	// Options
+	buffer        *blockDataBuffer
+	infiniteRetry bool
 
 	logger    *zap.Logger
 	tracer    logging.Tracer
@@ -54,6 +56,15 @@ func WithBlockDataBuffer(bufferSize int) Option {
 	return func(s *Sinker) {
 		buffer := newBlockDataBuffer(bufferSize)
 		s.buffer = buffer
+	}
+}
+
+// WithInfiniteRetry remove the maximum retry limit of 15 (hard-coded right now)
+// which spans approximatively 5m so that retry is perform indefinitely without
+// never exiting the process.
+func WithInfiniteRetry() Option {
+	return func(s *Sinker) {
+		s.infiniteRetry = true
 	}
 }
 
@@ -129,8 +140,13 @@ func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cur
 	}
 	s.OnTerminating(func(_ error) { closeFunc() })
 
-	// We will wait at max approximatively 5m before diying
-	backOff := backoff.WithContext(backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 15), ctx)
+	// We will wait at max approximatively 5m before dying
+	var backOff backoff.BackOff = backoff.NewExponentialBackOff()
+	if !s.infiniteRetry {
+		backOff = backoff.WithMaxRetries(backOff, 15)
+	}
+
+	backOff = backoff.WithContext(backOff, ctx)
 
 	startBlock := blockRange.StartBlock()
 	stopBlock := uint64(0)
@@ -149,7 +165,14 @@ func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cur
 			ProductionMode: s.mode == SubstreamsModeProduction,
 		}
 
-		activeCursor, err = s.doRequest(ctx, activeCursor, req, ssClient, callOpts)
+		var receivedMessage bool
+		activeCursor, receivedMessage, err = s.doRequest(ctx, activeCursor, req, ssClient, callOpts)
+
+		// If we received at least one message, we must reset the backoff
+		if receivedMessage {
+			backOff.Reset()
+		}
+
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				if blockRange.ReachedEndBlock(activeCursor.Block.Num()) {
@@ -177,15 +200,24 @@ func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cur
 	}
 }
 
-func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsubstreams.Request, ssClient pbsubstreams.StreamClient, callOpts []grpc.CallOption) (*Cursor, error) {
-	activeCursor := defaultCursor
-
-	s.logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum))
+func (s *Sinker) doRequest(
+	ctx context.Context,
+	activeCursor *Cursor,
+	req *pbsubstreams.Request,
+	ssClient pbsubstreams.StreamClient,
+	callOpts []grpc.CallOption,
+) (
+	*Cursor,
+	bool,
+	error,
+) {
+	s.logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
+	receivedMessage := false
 
 	progressMessageCount := 0
 	stream, err := ssClient.Blocks(ctx, req, callOpts...)
 	if err != nil {
-		return activeCursor, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
+		return activeCursor, receivedMessage, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
 	}
 
 	for {
@@ -196,11 +228,13 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 		resp, err := stream.Recv()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return activeCursor, err
+				return activeCursor, receivedMessage, err
 			}
 
-			return activeCursor, fmt.Errorf("receive stream next message: %w", err)
+			return activeCursor, receivedMessage, fmt.Errorf("receive stream next message: %w", err)
 		}
+
+		receivedMessage = true
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreams.Response_Progress:
@@ -225,12 +259,12 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 
 				err = s.buffer.AddBlockData(r.Data)
 				if err != nil {
-					return activeCursor, fmt.Errorf("buffer add block data: %w", err)
+					return activeCursor, receivedMessage, fmt.Errorf("buffer add block data: %w", err)
 				}
 
 				dataToProcess, err = s.buffer.GetBlockData()
 				if err != nil {
-					return activeCursor, fmt.Errorf("get block data from buffer: %w", err)
+					return activeCursor, receivedMessage, fmt.Errorf("get block data from buffer: %w", err)
 				}
 			}
 
@@ -238,7 +272,7 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 				block := bstream.NewBlockRef(blockData.Clock.Id, blockData.Clock.Number)
 				currentCursor := NewCursor(blockData.Cursor, block)
 				if err := s.blockScopeDataHandler(ctx, currentCursor, blockData); err != nil {
-					return activeCursor, fmt.Errorf("handle block scope data: %w", err)
+					return activeCursor, receivedMessage, fmt.Errorf("handle block scope data: %w", err)
 				}
 
 				s.stats.RecordBlock(block)
@@ -249,7 +283,6 @@ func (s *Sinker) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 		default:
 			s.logger.Info("received unknown type of message", zap.Reflect("message", r))
 		}
-
 	}
 }
 

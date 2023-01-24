@@ -26,6 +26,28 @@ func (c *Cursor) IsBlank() bool {
 	return c.Cursor == ""
 }
 
+func (c *Cursor) IsEqualTo(other *Cursor) bool {
+	if c == nil && other == nil {
+		return true
+	}
+
+	// We know both are not equal, so if either side is `nil`, we are sure the other is not, so not equal
+	if c == nil || other == nil {
+		return false
+	}
+
+	// Both side are non-nil here
+	return c.Cursor == other.Cursor
+}
+
+func (c *Cursor) String() string {
+	if c == nil {
+		return "<Unset>"
+	}
+
+	return c.Cursor
+}
+
 //go:generate go-enum -f=$GOFILE --marshal --names
 
 // ENUM(
