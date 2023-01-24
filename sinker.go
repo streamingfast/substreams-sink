@@ -98,11 +98,6 @@ func New(
 		opt(s)
 	}
 
-	if s.buffer == nil && stepsContainUndo(s.forkSteps) {
-		logger.Info("no block data buffer provided. since undo steps are possible, using default buffer size", zap.Int("size", defaultBlockDataBufferSize))
-		s.buffer = newBlockDataBuffer(defaultBlockDataBufferSize)
-	}
-
 	return s, nil
 }
 
