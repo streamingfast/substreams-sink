@@ -18,7 +18,6 @@ type blockDataBuffer struct {
 	size              int
 	irrIdx            int
 	lastBlockReturned uint64
-	stopBlock         uint64
 
 	index *dataIndex
 
@@ -52,8 +51,8 @@ func (b *blockDataBuffer) AddBlockData(blockData *pbsubstreams.BlockScopedData) 
 }
 
 func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 
 	var blocks []*pbsubstreams.BlockScopedData
 
