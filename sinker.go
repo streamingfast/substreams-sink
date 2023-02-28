@@ -120,7 +120,7 @@ func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cur
 		if blockRange.EndBlock() != nil {
 			endBlockNum := new(uint64)
 			*endBlockNum = *(blockRange.EndBlock()) + uint64(s.buffer.size)
-			blockRange = bstream.NewRange(blockRange.StartBlock(), endBlockNum, bstream.WithExclusiveEnd())
+			blockRange = bstream.NewRangeExcludingEnd(blockRange.StartBlock(), *endBlockNum)
 		}
 	}
 
