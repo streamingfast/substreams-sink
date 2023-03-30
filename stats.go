@@ -15,6 +15,7 @@ type Stats struct {
 
 	progressMsgRate *dmetrics.AvgRatePromCounter
 	blockRate       *dmetrics.AvgRatePromCounter
+	dataMsgRate     *dmetrics.AvgRatePromCounter
 
 	lastBlock bstream.BlockRef
 	logger    *zap.Logger
@@ -26,6 +27,7 @@ func newStats(logger *zap.Logger) *Stats {
 
 		progressMsgRate: dmetrics.MustNewAvgRateFromPromCounter(ProgressMessageCount, 1*time.Second, 30*time.Second, "msg"),
 		blockRate:       dmetrics.MustNewAvgRateFromPromCounter(BlockCount, 1*time.Second, 30*time.Second, "blocks"),
+		dataMsgRate:     dmetrics.MustNewAvgRateFromPromCounter(DataMessageCount, 1*time.Second, 30*time.Second, "ms"),
 
 		logger: logger,
 	}
@@ -52,6 +54,7 @@ func (s *Stats) Start(each time.Duration) {
 				// Logging fields order is important as it affects the final rendering, we carefully ordered
 				// them so the development logs looks nicer.
 				fields := []zap.Field{
+					zap.Stringer("data_msg_rate", s.dataMsgRate),
 					zap.Stringer("progress_msg_rate", s.progressMsgRate),
 					zap.Stringer("block_rate", s.blockRate),
 				}

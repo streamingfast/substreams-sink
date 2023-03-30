@@ -252,6 +252,8 @@ func (s *Sinker) doRequest(
 				cursor := NewCursor(r.Data.Cursor, block)
 				activeCursor = cursor
 
+				HeadBlockNumber.SetUint64(block.Num())
+
 				err = s.buffer.AddBlockData(r.Data)
 				if err != nil {
 					return activeCursor, receivedMessage, fmt.Errorf("buffer add block data: %w", err)
