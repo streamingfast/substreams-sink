@@ -252,8 +252,6 @@ func (s *Sinker) doRequest(
 				cursor := NewCursor(r.Data.Cursor, block)
 				activeCursor = cursor
 
-				HeadBlockNumber.SetUint64(block.Num())
-
 				err = s.buffer.AddBlockData(r.Data)
 				if err != nil {
 					return activeCursor, receivedMessage, fmt.Errorf("buffer add block data: %w", err)
@@ -272,6 +270,7 @@ func (s *Sinker) doRequest(
 					return activeCursor, receivedMessage, fmt.Errorf("handle block scope data: %w", err)
 				}
 
+				HeadBlockNumber.SetUint64(block.Num())
 				s.stats.RecordBlock(block)
 				BlockCount.AddInt(1)
 			}

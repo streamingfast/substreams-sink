@@ -12,4 +12,4 @@ var SubstreamsErrorCount = metrics.NewCounter("substreams_sink_error", "The erro
 var DataMessageCount = metrics.NewCounterVec("substreams_sink_data_message", []string{"module"}, "The number of data message received")
 var ProgressMessageCount = metrics.NewCounterVec("substreams_sink_progress_message", []string{"module"}, "The number of progress message received")
 var BlockCount = metrics.NewCounter("substreams_sink_block_count", "The number of data received")
-var HeadBlockNumber = metrics.NewHeadBlockNumber("substreams_sink")
+var HeadBlockNumber = metrics.NewHeadBlockNumber("substreams_sink_kv")
