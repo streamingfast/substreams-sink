@@ -170,15 +170,16 @@ func (s *Sinker) run(ctx context.Context, blockRange *bstream.Range, cursor *Cur
 
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				if blockRange.ReachedEndBlock(activeCursor.Block.Num()) {
-					s.logger.Info("substreams ended correctly, reached your stop block",
-						zap.String("last_cursor", activeCursor.Cursor),
-					)
-					return nil
-				}
-				s.logger.Info("substreams ended correctly, will attempt to reconnect in 15 seconds",
+				// We must assume that receiving an `io.EOF` means the stop block was reached. This is because
+				// on network that can skips block number, it's possible that we requested to stop on a block
+				// number that is no in the chain meaning we will receive `io.EOF` but the last seen block before
+				// it is not our block number, we must have confidence in the Substreams provider to respect the
+				// protocol
+				s.logger.Info("substreams ended correctly, reached your stop block",
 					zap.String("last_cursor", activeCursor.Cursor),
 				)
+
+				return nil
 			}
 			SubstreamsErrorCount.Inc()
 			s.logger.Error("substreams encountered an error", zap.Error(err))
