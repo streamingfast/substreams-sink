@@ -17,7 +17,7 @@ main() {
 
   # FIXME Check actual release date for knowing if "recent enough"
 
-  exec sfreleaser --root "$ROOT" --language go --variant application release "$@"
+  exec sfreleaser --root "$ROOT" --language golang --variant library release "$@"
 }
 
 main "$@"
