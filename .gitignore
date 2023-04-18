@@ -1,1 +1,5 @@
+.envrc
+.env.release
 .idea
+.release_notes.md
+dist/
