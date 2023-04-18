@@ -9,5 +9,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Highlights
 
-First official release of the library, latest release until refactor to support the new upcoming
-Substreams V2 RPC protocol.
+First official release of the library, latest release until refactor to support the new upcoming Substreams V2 RPC protocol.
