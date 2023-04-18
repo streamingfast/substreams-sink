@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestLivenessChecker_IsLive(t *testing.T) {
@@ -18,7 +18,7 @@ func TestLivenessChecker_IsLive(t *testing.T) {
 	}
 
 	tests := []struct {
-		block              *pbsubstreams.BlockScopedData
+		block              *pbsubstreamsrpc.BlockScopedData
 		expectedResult     bool
 		expectedTimeChecks int
 	}{
@@ -44,9 +44,8 @@ func TestLivenessChecker_IsLive(t *testing.T) {
 
 }
 
-func testBlock(id string, num uint64, time time.Time) *pbsubstreams.BlockScopedData {
-	blockData := &pbsubstreams.BlockScopedData{
-		Step:   pbsubstreams.ForkStep_STEP_NEW,
+func testBlock(id string, num uint64, time time.Time) *pbsubstreamsrpc.BlockScopedData {
+	blockData := &pbsubstreamsrpc.BlockScopedData{
 		Cursor: "",
 		Clock: &pbsubstreams.Clock{
 			Id:        id,

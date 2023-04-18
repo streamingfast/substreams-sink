@@ -1,0 +1,241 @@
+package sink
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/logging"
+	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/manifest"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
+)
+
+// AddFlagsToSet can be used to import standard flags needed for sink to configure itself. By using
+// this method to define your flag and using `cli.ConfigureViper` (import "github.com/streamingfast/cli")
+// in your main application command, `NewFromViper` is usable to easily create a `sink.Sinker` instance.
+//
+// Defines
+//
+//	Flag `--insecure` (-k) (defaults `false`)
+//	Flag `--plaintext` (-p) (defaults `false`)
+//	Flag `--undo-buffer-size` (defaults `12`)
+//	Flag `--live-block-time-delta` (defaults `300*time.Second`)
+//	Flag `--development-mode` (defaults `false`)
+//	Flag `--final-blocks-only` (defaults `false`)
+//	Flag `--infinite-retry` (defaults `false`)
+func AddFlagsToSet(flags *pflag.FlagSet) {
+	flags.BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
+	flags.BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
+	flags.Int("undo-buffer-size", 12, "Number of blocks to keep buffered to handle fork reorganizations")
+	flags.Duration("live-block-time-delta", 300*time.Second, "Consider chain live if block time is within this number of seconds of current time")
+	flags.Bool("development-mode", false, "Enable development mode, use it for testing purpose only, should not be used for production workload")
+	flags.Bool("final-blocks-only", false, "Get only final blocks")
+	flags.Bool("infinite-retry", false, "Default behavior is to retry 15 times spanning approximatively 5m before exiting with an error, activating this flag will retry forever")
+
+	// Deprecated flags
+	flags.Bool("irreversible-only", false, "Get only irreversible blocks")
+	flags.Lookup("irreversible-only").Deprecated = "Renamed to --final-blocks-only"
+}
+
+// NewFromViper constructs a new Sinker instance from a fixed set of "known" flags.
+func NewFromViper(
+	expectedModuleType string,
+	endpointArg, manifestPathArg, outputModuleNameArg, blockRangeArg string,
+	flagPrefix string,
+	zlog *zap.Logger,
+	tracer logging.Tracer,
+	opts ...Option,
+) (*Sinker, error) {
+	zlog.Info("sinker from CLI",
+		zap.String("endpoint", endpointArg),
+		zap.String("manifest_path", manifestPathArg),
+		zap.String("output_module_name", outputModuleNameArg),
+		zap.String("expected_module_type", expectedModuleType),
+		zap.String("block_range", blockRangeArg),
+	)
+
+	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPathArg))
+	pkg, err := manifest.NewReader(manifestPathArg).Read()
+	if err != nil {
+		return nil, fmt.Errorf("read manifest: %w", err)
+	}
+
+	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+	if err != nil {
+		return nil, fmt.Errorf("create substreams moduel graph: %w", err)
+	}
+
+	zlog.Info("validating output store", zap.String("output_store", outputModuleNameArg))
+	module, err := graph.Module(outputModuleNameArg)
+	if err != nil {
+		return nil, fmt.Errorf("get output module %q: %w", outputModuleNameArg, err)
+	}
+	if module.GetKindMap() == nil {
+		return nil, fmt.Errorf("ouput module %q is *not* of  type 'Mapper'", outputModuleNameArg)
+	}
+
+	unprefixedExpectedType, prefixedModuleType := sanitizeModuleType(expectedModuleType)
+	if module.Output.Type != prefixedModuleType {
+		unprefixedActualType, _ := sanitizeModuleType(module.Output.Type)
+		return nil, fmt.Errorf("sink only supports map module with output type %q but selected module output type is %q", unprefixedExpectedType, unprefixedActualType)
+	}
+
+	hashes := manifest.NewModuleHashes()
+	outputModuleHash := hashes.HashModule(pkg.Modules, module, graph)
+
+	apiToken := readAPIToken(flagPrefix)
+	blockRange, err := readBlockRange(module, blockRangeArg)
+	if err != nil {
+		return nil, fmt.Errorf("resolve block range: %w", err)
+	}
+
+	zlog.Debug("resolved block range", zap.Stringer("range", blockRange))
+
+	undoBufferSize := viper.GetInt(flagPrefix + "-undo-buffer-size")
+	liveBlockTimeDelta := viper.GetDuration(flagPrefix + "-live-block-time-delta")
+	isDevelopmentMode := viper.GetBool(flagPrefix + "-development-mode")
+	infiniteRetry := viper.GetBool(flagPrefix + "-infinite-retry")
+
+	finalBlocksOnly := viper.GetBool(flagPrefix + "-final-blocks-only")
+	if !viper.IsSet(flagPrefix + "-final-blocks-only") {
+		finalBlocksOnly = viper.GetBool(flagPrefix + "-irreversible-only")
+	}
+
+	clientConfig := client.NewSubstreamsClientConfig(
+		endpointArg,
+		apiToken,
+		viper.GetBool(flagPrefix+"-insecure"),
+		viper.GetBool(flagPrefix+"-plaintext"),
+	)
+
+	mode := SubstreamsModeProduction
+	if isDevelopmentMode {
+		mode = SubstreamsModeDevelopment
+	}
+
+	var defaultSinkOptions []Option
+	if undoBufferSize > 0 {
+		defaultSinkOptions = append(defaultSinkOptions, WithBlockDataBuffer(undoBufferSize))
+	}
+
+	if infiniteRetry {
+		defaultSinkOptions = append(defaultSinkOptions, WithInfiniteRetry())
+	}
+
+	if liveBlockTimeDelta > 0 {
+		defaultSinkOptions = append(defaultSinkOptions, WithLivenessChecker(NewLivenessChecker(liveBlockTimeDelta)))
+	}
+
+	if finalBlocksOnly {
+		defaultSinkOptions = append(defaultSinkOptions, WithFinalBlockOnly())
+	}
+
+	if blockRange != nil {
+		defaultSinkOptions = append(defaultSinkOptions, WithBlockRange(blockRange))
+	}
+
+	return New(
+		mode,
+		pkg.Modules,
+		module,
+		outputModuleHash,
+		clientConfig,
+		zlog,
+		tracer,
+		append(defaultSinkOptions, opts...)...,
+	)
+}
+
+// parseNumber parses a number and indicates whether the number is relative, meaning it starts with a +
+func parseNumber(number string) (int64, bool, error) {
+	numberIsRelative := strings.HasPrefix(number, "+")
+	numberInt64, err := strconv.ParseInt(strings.TrimPrefix(number, "+"), 0, 64)
+	if err != nil {
+		return 0, false, fmt.Errorf("invalid block number value: %w", err)
+	}
+	return numberInt64, numberIsRelative, nil
+}
+
+func readBlockRange(module *pbsubstreams.Module, input string) (*bstream.Range, error) {
+	if input == "" {
+		input = "-1"
+	}
+
+	before, after, rangeHasStartAndStop := strings.Cut(input, ":")
+
+	beforeAsInt64, beforeIsRelative, err := parseNumber(before)
+	if err != nil {
+		return nil, fmt.Errorf("parse number %q: %w", before, err)
+	}
+
+	afterIsRelative := false
+	afterAsInt64 := int64(0)
+	if rangeHasStartAndStop {
+		afterAsInt64, afterIsRelative, err = parseNumber(after)
+		if err != nil {
+			return nil, fmt.Errorf("parse number %q: %w", after, err)
+		}
+
+	}
+
+	// If there is no `:` we assume it's a stop block value right away
+	if !rangeHasStartAndStop {
+		if beforeAsInt64 < 1 {
+			return bstream.NewOpenRange(module.InitialBlock), nil
+		}
+		start := module.InitialBlock
+		stop := resolveBlockNumber(beforeAsInt64, 0, beforeIsRelative, int64(start))
+		return bstream.NewRangeExcludingEnd(start, uint64(stop)), nil
+	}
+
+	start := resolveBlockNumber(beforeAsInt64, int64(module.InitialBlock), beforeIsRelative, int64(module.InitialBlock))
+	if afterAsInt64 == -1 {
+		return bstream.NewOpenRange(uint64(start)), nil
+	}
+
+	return bstream.NewRangeExcludingEnd(uint64(start), uint64(resolveBlockNumber(afterAsInt64, 0, afterIsRelative, start))), nil
+}
+
+func resolveBlockNumber(value int64, defaultIfNegative int64, relative bool, against int64) int64 {
+	if !relative {
+		if value < 0 {
+			return defaultIfNegative
+		}
+		return value
+	}
+	return int64(against) + value
+}
+
+func readAPIToken(flagPrefix string) string {
+	apiToken := viper.GetString(flagPrefix + "api-token")
+	if apiToken != "" {
+		return apiToken
+	}
+
+	apiToken = os.Getenv("SUBSTREAMS_API_TOKEN")
+	if apiToken != "" {
+		return apiToken
+	}
+
+	return os.Getenv("SF_API_TOKEN")
+}
+
+// sanitizeModuleType give back both prefixed (so with `proto:`) and unprefixed
+// version of the input string:
+//
+// - `sanitizeModuleType("com.acme") == (com.acme, proto:com.acme)`
+// - `sanitizeModuleType("proto:com.acme") == (com.acme, proto:com.acme)`
+func sanitizeModuleType(in string) (unprefixed, prefixed string) {
+	if strings.HasPrefix("proto:", in) {
+		return strings.TrimPrefix(in, "proto:"), in
+	}
+
+	return in, "proto:" + in
+}

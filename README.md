@@ -7,42 +7,49 @@ What you get by using this library:
 
 - Handles connection and reconnections
 - Throughput Logging (block rates, etc)
-- Best Practise error handling
+- Best Practices error handling
 
 ### Usage
 
-The library provides a `Sinker` class that can be used to connect to the Substreams API. The `Sinker` class is a wrapper around the `substreams` library, which is a low-level library that provides a convenient way to connect to the Substreams API. 
+The library provides a `Sinker` class that can be used to connect to the Substreams API. The `Sinker` class is a wrapper around the `substreams` library, which is a low-level library that provides a convenient way to connect to the Substreams API.
 
-The user's primary responsibility when creating a custom sink is to implement a `BlockScopeDataHandler` implementation which has the following interface:
-
-```go
-type BlockScopeDataHandler = func(ctx context.Context, cursor *Cursor, data *pbsubstreams.BlockScopedData) error
-```
-* `ctx`: the context that was used to retrieve the data.
-* `cursor`: the cursor at the given block. This cursor should be saved regularly as a checkpoint in case the process is interrupted.
-* `data`: `*pbsubstreams.BlockScopedData` parameter contains the data that was received from the Substreams API, and has the following fields: 
+The user's primary responsibility when creating a custom sink is to pass a `BlockScopedDataHandler` and a `BlockUndoSignalHandler` implementation(s) which has the following interface:
 
 ```go
-type BlockScopedData struct {
-	Outputs []*pbsubstreams.ModuleOutput 
-	Clock   *pbsubstreams.Clock          
-	Step    ForkStep        
-	Cursor  string          
-}
+impport (
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+)
+
+type BlockScopedDataHandler = func(ctx context.Context, cursor *Cursor, data *pbsubstreamsrpc.BlockScopedData) error
+type BlockUndoSignalHandler = func(ctx context.Context, cursor *Cursor, undoSignal *pbsubstreamsrpc.BlockUndoSignal) error
 ```
 
-> note: pbsubstreams is the common alias for the `github.com/streamingfast/substreams/pb/sf/substreams/v1` package found [here](https://github.com/streamingfast/substreams/tree/develop/pb/sf/substreams/v1).
+##### `BlockScopedDataHandler`
 
+* `ctx context.Context` is the `sink.Sinker` actual `context.Context`.
+* `cursor *Cursor` is the cursor at the given block, this cursor should be saved regularly as a checkpoint in case the process is interrupted.
+* `data *pbsubstreamsrpc.BlockScopedData` contains the data that was received from the Substreams API, refer to it's definition for proper usage.
 
-The `BlockScopeDataHandler` is called for each block scoped data message that is received from the Substreams API and contains all the data output for the given substreams module.
+##### `BlockUndoSignalHandler`
 
-The `BlockScopeDataHandler` is responsible for decoding and processing the data, and returning an error if there is a problem. The `BlockScopeDataHandler` is also responsible for storing the cursor to the last processed block number. 
+* `ctx context.Context` is the `sink.Sinker` actual `context.Context`.
+* `cursor *Cursor` is the cursor to use after the undo, this cursor should be saved regularly as a checkpoint in case the process is interrupted.
+* `data *pbsubstreamsrpc.BlockUndoSignal` contains the last valid block that is still valid, any data saved after this last saved block should be discarded.
+
+#### Handlers Flow
 
 The basic pattern for using the `Sinker` is as follows:
 
-* Create your data layer which is responsible for decoding the substreams' data and saving it to the desired storage.
-* Have this object implement the `BlockScopeDataHandler` interface.
-* Create a `Sinker` object using `sink.New` and pass in the `BlockScopeDataHandler` object.
+* Create your data layer which is responsible for decoding the Substreams' data and saving it to the desired storage.
+* Have this object implement handling of `*pbsubstreamsrpc.BlockScopedData` message.
+* Have this object implement handling of `*pbsubstreamsrpc.BlockUndoSignal` message.
+* Create a `Sinker` object using `sink.New` and pass in the two handlers that calls your implementations.
+
+The `BlockScopedDataHandler` is called for each block scoped data message that is received from the Substreams API and contains all the data output for the given Substreams module. In your handler, you are responsible for decoding and processing the data, and returning an error if there is a problem. It's there also that you should persist the cursor according to your persistence logic.
+
+The `BlockUndoSignalHandler` is called when a message `*pbsubstreamsrpc.BlockUndoSignal` is received from the stream. Those message contains a `LastValidBlock` which points to the last block should be assumed to be part of the canonical chain as well as `LastValidCursor` which should be used as the current active cursor.
+
+How is the `*pbsubstreamsrpc.BlockUndoSignal` is actually is implementation dependent. The correct behavior is to treat every piece of data that is contained in a `BlockScopedData` whose `BlockScopedData.Clock.Number` is `> LastValidBlock.Number` as now invalid. For example, if all written entities have a block number, one handling possibility is to delete every entities where `blockNumber > LastValidBlock.Number`.
 
 ### Launching
 

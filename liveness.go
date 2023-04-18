@@ -1,19 +1,20 @@
 package sink
 
 import (
-	"sync"
 	"time"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
+
+type LivenessCheck interface {
+	IsLive(block *pbsubstreams.Clock) bool
+}
 
 type LivenessChecker struct {
 	delta   time.Duration
 	nowFunc func() time.Time
 
 	isLive bool
-
-	mu sync.RWMutex
 }
 
 func NewLivenessChecker(delta time.Duration) *LivenessChecker {
@@ -23,16 +24,16 @@ func NewLivenessChecker(delta time.Duration) *LivenessChecker {
 	}
 }
 
-func (t *LivenessChecker) IsLive(block *pbsubstreams.BlockScopedData) bool {
+func (t *LivenessChecker) IsLive(clock *pbsubstreams.Clock) bool {
 	if t.isLive {
 		return true
 	}
 
-	if block == nil || block.Clock == nil {
+	if clock == nil {
 		return false
 	}
 
-	blockTimeStamp := block.Clock.GetTimestamp()
+	blockTimeStamp := clock.GetTimestamp()
 	if blockTimeStamp == nil {
 		return false
 	}
