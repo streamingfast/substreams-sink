@@ -2,7 +2,6 @@ package sink
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -15,7 +14,6 @@ import (
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -29,7 +27,6 @@ type Sinker struct {
 	modules               *pbsubstreams.Modules
 	outputModule          *pbsubstreams.Module
 	mode                  SubstreamsMode
-	outputModuleHash      string
 	stats                 *Stats
 	blockScopeDataHandler BlockScopeDataHandler
 
@@ -72,7 +69,6 @@ func New(
 	mode SubstreamsMode,
 	modules *pbsubstreams.Modules,
 	outputModule *pbsubstreams.Module,
-	hash manifest.ModuleHash,
 	h BlockScopeDataHandler,
 	clientConfig *client.SubstreamsClientConfig,
 	forkSteps []pbsubstreams.ForkStep,
@@ -85,7 +81,6 @@ func New(
 		clientConfig:          clientConfig,
 		modules:               modules,
 		outputModule:          outputModule,
-		outputModuleHash:      hex.EncodeToString(hash),
 		mode:                  mode,
 		blockScopeDataHandler: h,
 		stats:                 newStats(logger),
