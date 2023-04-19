@@ -128,7 +128,10 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handlers SinkerHandler
 
 	s.stats.Start(logEach)
 
-	fields := []zap.Field{zap.Duration("stats_refresh_each", logEach), zap.Stringer("restarting_at", cursor.Block())}
+	fields := []zap.Field{zap.Duration("stats_refresh_each", logEach)}
+	if cursor != nil {
+		fields = append(fields, zap.Stringer("restarting_at", cursor.Block()))
+	}
 	if blockRange := s.adjustStreamRange(); blockRange != nil && blockRange.EndBlock() != nil {
 		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", blockRange.EndBlock())))
 	}
