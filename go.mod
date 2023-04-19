@@ -6,11 +6,10 @@ require (
 	github.com/bobg/go-generics/v2 v2.1.1
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/streamingfast/bstream v0.0.2-0.20230407143220-06c919ae8476
-	github.com/streamingfast/derr v0.0.0-20221125175206-82e01d420d45
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams v1.0.3-0.20230413172658-137b8e69b6de
+	github.com/streamingfast/substreams v1.0.2-0.20230418195519-fa17a36fd728
 	go.uber.org/zap v1.21.0
 )
 
@@ -23,13 +22,11 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
-	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/streamingfast/dstore v0.1.1-0.20230126133209-44cda2076cfe // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
@@ -99,6 +96,6 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 	google.golang.org/grpc v1.54.0
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/protobuf v1.28.2-0.20230222093303-bc1253ad3743
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
