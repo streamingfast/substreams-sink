@@ -72,7 +72,7 @@ func NewFromViper(
 		return nil, fmt.Errorf("create substreams moduel graph: %w", err)
 	}
 
-	zlog.Info("validating output store", zap.String("output_store", outputModuleNameArg))
+	zlog.Info("validating output module", zap.String("module_name", outputModuleNameArg))
 	module, err := graph.Module(outputModuleNameArg)
 	if err != nil {
 		return nil, fmt.Errorf("get output module %q: %w", outputModuleNameArg, err)
@@ -81,10 +81,12 @@ func NewFromViper(
 		return nil, fmt.Errorf("ouput module %q is *not* of  type 'Mapper'", outputModuleNameArg)
 	}
 
+	zlog.Info("validating output module type", zap.String("module_name", module.Name), zap.String("module_type", module.Output.Type))
+
 	unprefixedExpectedType, prefixedModuleType := sanitizeModuleType(expectedModuleType)
 	if module.Output.Type != prefixedModuleType {
 		unprefixedActualType, _ := sanitizeModuleType(module.Output.Type)
-		return nil, fmt.Errorf("sink only supports map module with output type %q but selected module output type is %q", unprefixedExpectedType, unprefixedActualType)
+		return nil, fmt.Errorf("sink only supports map module with output type %q but selected module %q output type is %q", unprefixedExpectedType, module.Name, unprefixedActualType)
 	}
 
 	hashes := manifest.NewModuleHashes()

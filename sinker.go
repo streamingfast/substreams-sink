@@ -21,7 +21,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type Sinker struct {
@@ -129,7 +128,7 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handlers SinkerHandler
 
 	s.stats.Start(logEach)
 
-	fields := []zap.Field{zap.Duration("stats_refresh_each", logEach), zap.Stringer("restarting_at", cursor.Block)}
+	fields := []zap.Field{zap.Duration("stats_refresh_each", logEach), zap.Stringer("restarting_at", cursor.Block())}
 	if blockRange := s.adjustStreamRange(); blockRange != nil && blockRange.EndBlock() != nil {
 		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", blockRange.EndBlock())))
 	}
@@ -137,7 +136,7 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handlers SinkerHandler
 	s.logger.Info("starting sinker", fields...)
 	lastCursor, err := s.run(ctx, cursor, handlers)
 	if err == nil {
-		s.logger.Info("substreams ended correctly, reached your stop block", zap.Stringer("last_block_seen", lastCursor.Block))
+		s.logger.Info("substreams ended correctly, reached your stop block", zap.Stringer("last_block_seen", lastCursor.Block()))
 	}
 
 	// If the context is canceled and we are here, it we have stop running without any other error, so Shutdown without error,

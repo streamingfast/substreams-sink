@@ -67,7 +67,9 @@ func (s SinkerHandlers) String() string {
 	return fmt.Sprintf("HandleBlockScopedData: %s, HandleBlockUndoSignal: %s", dataHandlerState, undoHandlerState)
 }
 
-type Cursor bstream.Cursor
+type Cursor struct {
+	*bstream.Cursor
+}
 
 func NewCursor(cursor string) (*Cursor, error) {
 	if cursor == "" {
@@ -79,7 +81,7 @@ func NewCursor(cursor string) (*Cursor, error) {
 		return nil, fmt.Errorf("decode %q: %w", cursor, err)
 	}
 
-	return (*Cursor)(decoded), nil
+	return &Cursor{decoded}, nil
 }
 
 func MustNewCursor(cursor string) *Cursor {
@@ -91,10 +93,18 @@ func MustNewCursor(cursor string) *Cursor {
 	return decoded
 }
 
-var blankCursor = (*Cursor)((*bstream.Cursor)(nil))
+var blankCursor = (*Cursor)(nil)
 
 func NewBlankCursor() *Cursor {
 	return blankCursor
+}
+
+func (c *Cursor) Block() bstream.BlockRef {
+	if c.IsBlank() {
+		return unsetBlockRef{}
+	}
+
+	return c.Cursor.Block
 }
 
 func (c *Cursor) IsBlank() bool {
@@ -112,8 +122,8 @@ func (c *Cursor) IsEqualTo(other *Cursor) bool {
 	}
 
 	// Both side are non-nil here
-	actual := (*bstream.Cursor)(c)
-	candidate := (*bstream.Cursor)(other)
+	actual := c.Cursor
+	candidate := other.Cursor
 
 	return actual.Equals(candidate)
 }
@@ -135,7 +145,7 @@ func (c *Cursor) String() string {
 		return ""
 	}
 
-	return (*bstream.Cursor)(c).ToOpaque()
+	return c.Cursor.ToOpaque()
 }
 
 //go:generate go-enum -f=$GOFILE --marshal --names
