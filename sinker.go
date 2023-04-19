@@ -217,11 +217,6 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handlers SinkerHandler
 			// Retryable or not, we increment the error counter in all those cases
 			SubstreamsErrorCount.Inc()
 
-			// A context canceled is never retryable
-			if errors.Is(err, context.Canceled) || dgrpc.IsGRPCErrorCode(err, codes.Canceled) {
-				return activeCursor, err
-			}
-
 			var retryableError *RetryableError
 			if errors.As(err, &retryableError) {
 				s.logger.Error("substreams encountered a retryable error", zap.Error(retryableError.original))
@@ -297,7 +292,7 @@ func (s *Sinker) doRequest(
 			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
 				switch dgrpcError.Code() {
 				case codes.Unauthenticated, codes.Canceled:
-					return activeCursor, receivedMessage, err
+					return activeCursor, receivedMessage, fmt.Errorf("stream failure: %w", err)
 				}
 			}
 
