@@ -28,11 +28,11 @@ func WithInfiniteRetry() Option {
 	}
 }
 
-// WithFinalBlockOnly configures a the [Sinker] to which itself configurs the Substreams
+// WithFinalBlocksOnly configures a the [Sinker] to which itself configurs the Substreams
 // gRPC stream to only send [pbsubstreamsrpc.BlockScopedData] once the block is final, this
 // means that `WithBlockDataBuffer` if used has is discarded and [BlockUndoSignalHandler]
 // will never be called.
-func WithFinalBlockOnly() Option {
+func WithFinalBlocksOnly() Option {
 	return func(s *Sinker) {
 		s.finalBlocksOnly = true
 	}
@@ -42,7 +42,7 @@ func WithFinalBlockOnly() Option {
 //
 // By configuring a liveness checker, the [MessageContext] received by [BlockScopedDataHandler]
 // and [BlockUndoSignalHandler] will have the field [MessageContext.IsLive] properly populated.
-func WithLivenessChecker(livenessChecker LivenessCheck) Option {
+func WithLivenessChecker(livenessChecker LivenessChecker) Option {
 	return func(s *Sinker) {
 		s.livenessChecker = livenessChecker
 	}

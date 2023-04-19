@@ -25,7 +25,7 @@ type SinkerHandlers struct {
 	// The handler receives the following arguments:
 	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
 	// - `data` contains the block scoped data that was received from the Substreams API, refer to it's definition for proper usage.
-	// - `isLive` will be non-nil if a [LivenessCheck] has been configured on the [Sinker] instance that call the handler.
+	// - `isLive` will be non-nil if a [LivenessChecker] has been configured on the [Sinker] instance that call the handler.
 	// - `cursor` is the cursor at the given block, this cursor should be saved regularly as a checkpoint in case the process is interrupted.
 	//
 	// The [HandleBlockScopedData] must be non-nil, the [Sinker] enforces this.

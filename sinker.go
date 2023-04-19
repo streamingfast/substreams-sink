@@ -41,7 +41,7 @@ type Sinker struct {
 	blockRange      *bstream.Range
 	infiniteRetry   bool
 	finalBlocksOnly bool
-	livenessChecker LivenessCheck
+	livenessChecker LivenessChecker
 
 	// State
 	stats *Stats

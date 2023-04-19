@@ -6,25 +6,25 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type LivenessCheck interface {
+type LivenessChecker interface {
 	IsLive(block *pbsubstreams.Clock) bool
 }
 
-type LivenessChecker struct {
+type DeltaLivenessChecker struct {
 	delta   time.Duration
 	nowFunc func() time.Time
 
 	isLive bool
 }
 
-func NewLivenessChecker(delta time.Duration) *LivenessChecker {
-	return &LivenessChecker{
+func NewDeltaLivenessChecker(delta time.Duration) *DeltaLivenessChecker {
+	return &DeltaLivenessChecker{
 		delta:   delta,
 		nowFunc: time.Now,
 	}
 }
 
-func (t *LivenessChecker) IsLive(clock *pbsubstreams.Clock) bool {
+func (t *DeltaLivenessChecker) IsLive(clock *pbsubstreams.Clock) bool {
 	if t.isLive {
 		return true
 	}

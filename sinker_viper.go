@@ -130,11 +130,11 @@ func NewFromViper(
 	}
 
 	if liveBlockTimeDelta > 0 {
-		defaultSinkOptions = append(defaultSinkOptions, WithLivenessChecker(NewLivenessChecker(liveBlockTimeDelta)))
+		defaultSinkOptions = append(defaultSinkOptions, WithLivenessChecker(NewDeltaLivenessChecker(liveBlockTimeDelta)))
 	}
 
 	if finalBlocksOnly {
-		defaultSinkOptions = append(defaultSinkOptions, WithFinalBlockOnly())
+		defaultSinkOptions = append(defaultSinkOptions, WithFinalBlocksOnly())
 	}
 
 	if blockRange != nil {
