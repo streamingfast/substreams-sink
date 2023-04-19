@@ -294,14 +294,15 @@ func (s *Sinker) doRequest(
 				return activeCursor, receivedMessage, err
 			}
 
-			status, isGRPCError := status.FromError(err)
-
-			err = fmt.Errorf("receive stream next message: %w", err)
-			if isGRPCError && status.Code() == codes.Canceled {
-				err = retryable(err)
+			// Unauthanticated and canceled are not retryable
+			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
+				switch dgrpcError.Code() {
+				case codes.Unauthenticated, codes.Canceled:
+					return activeCursor, receivedMessage, err
+				}
 			}
 
-			return activeCursor, receivedMessage, err
+			return activeCursor, receivedMessage, retryable(err)
 		}
 
 		receivedMessage = true
