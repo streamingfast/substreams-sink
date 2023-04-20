@@ -65,7 +65,7 @@ func NewFromViper(
 		zap.String("endpoint", endpoint),
 		zap.String("manifest_path", manifestPath),
 		zap.String("output_module_name", outputModuleName),
-		zap.String("expected_module_type", expectedOutputModuleType),
+		zap.Stringer("expected_module_type", expectedModuleType(expectedOutputModuleType)),
 		zap.String("block_range", blockRange),
 	)
 
@@ -77,7 +77,7 @@ func NewFromViper(
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
-		return nil, fmt.Errorf("create substreams moduel graph: %w", err)
+		return nil, fmt.Errorf("create substreams module graph: %w", err)
 	}
 
 	resolvedOutputModuleName := outputModuleName
@@ -101,16 +101,18 @@ func NewFromViper(
 
 	zlog.Info("validating output module type", zap.String("module_name", module.Name), zap.String("module_type", module.Output.Type))
 
-	unprefixedExpectedType, prefixedExpectedType := sanitizeModuleType(expectedOutputModuleType)
-	unprefixedActualType, prefixedActualType := sanitizeModuleType(module.Output.Type)
-	if prefixedActualType != prefixedExpectedType {
-		return nil, fmt.Errorf("sink only supports map module with output type %q but selected module %q output type is %q", unprefixedExpectedType, module.Name, unprefixedActualType)
+	if expectedOutputModuleType != IgnoreOutputModuleType {
+		unprefixedExpectedType, prefixedExpectedType := sanitizeModuleType(expectedOutputModuleType)
+		unprefixedActualType, prefixedActualType := sanitizeModuleType(module.Output.Type)
+		if prefixedActualType != prefixedExpectedType {
+			return nil, fmt.Errorf("sink only supports map module with output type %q but selected module %q output type is %q", unprefixedExpectedType, module.Name, unprefixedActualType)
+		}
 	}
 
 	hashes := manifest.NewModuleHashes()
 	outputModuleHash := hashes.HashModule(pkg.Modules, module, graph)
 
-	apiToken := readAPIToken(cmd)
+	apiToken := readAPIToken()
 	resolvedBlockRange, err := readBlockRange(module, blockRange)
 	if err != nil {
 		return nil, fmt.Errorf("resolve block range: %w", err)
@@ -233,7 +235,7 @@ func resolveBlockNumber(value int64, defaultIfNegative int64, relative bool, aga
 	return int64(against) + value
 }
 
-func readAPIToken(cmd *cobra.Command) string {
+func readAPIToken() string {
 	apiToken := os.Getenv("SUBSTREAMS_API_TOKEN")
 	if apiToken != "" {
 		return apiToken
@@ -253,4 +255,14 @@ func sanitizeModuleType(in string) (unprefixed, prefixed string) {
 	}
 
 	return in, "proto:" + in
+}
+
+type expectedModuleType string
+
+func (e expectedModuleType) String() string {
+	if e == expectedModuleType(IgnoreOutputModuleType) {
+		return "<Ignored>"
+	}
+
+	return string(e)
 }

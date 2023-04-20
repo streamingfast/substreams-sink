@@ -23,6 +23,11 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+// IgnoreOutputModuleType can be used instead of the expected output module type
+// when you want to validate this yourself, for example if you accept multiple
+// output type(s).
+const IgnoreOutputModuleType string = "@!##_IgnoreOutputModuleType_##!@"
+
 // InferOutputModuleFromPackage can be used instead of the actual module's output name
 // and has the effect that output module is extracted directly from the [pbsubstreams.Package]
 // via the `SinkModule` field.
@@ -120,6 +125,20 @@ func (s *Sinker) OutputModuleHash() string {
 
 func (s *Sinker) OutputModuleName() string {
 	return s.outputModule.Name
+}
+
+// OutputModuleTypePrefixed returns the prefixed output module's type so the type
+// will always be prefixed with "proto:".
+func (s *Sinker) OutputModuleTypePrefixed() (prefixed string) {
+	prefixed, _ = sanitizeModuleType(s.outputModule.Output.Type)
+	return
+}
+
+// OutputModuleTypeUnprefixed returns the unprefixed output module's type so the type
+// will **never** be prefixed with "proto:".
+func (s *Sinker) OutputModuleTypeUnprefixed() (unprefixed string) {
+	_, unprefixed = sanitizeModuleType(s.outputModule.Output.Type)
+	return
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {
