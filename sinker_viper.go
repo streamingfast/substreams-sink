@@ -50,24 +50,27 @@ func AddFlagsToSet(flags *pflag.FlagSet) {
 // If you want to extract the sink output module's name directly from the Substreams
 // package, if supported by your sink, instead of an actual name for paramater
 // `outputModuleNameArg`, use `sink.InferOutputModuleFromPackage`.
+//
+// The `expectedOutputModuleType` should be the fully qualified expected Protobuf
+// package
 func NewFromViper(
 	cmd *cobra.Command,
-	expectedModuleType string,
-	endpointArg, manifestPathArg, outputModuleNameArg, blockRangeArg string,
+	expectedOutputModuleType string,
+	endpoint, manifestPath, outputModuleName, blockRange string,
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 	opts ...Option,
 ) (*Sinker, error) {
 	zlog.Info("sinker from CLI",
-		zap.String("endpoint", endpointArg),
-		zap.String("manifest_path", manifestPathArg),
-		zap.String("output_module_name", outputModuleNameArg),
-		zap.String("expected_module_type", expectedModuleType),
-		zap.String("block_range", blockRangeArg),
+		zap.String("endpoint", endpoint),
+		zap.String("manifest_path", manifestPath),
+		zap.String("output_module_name", outputModuleName),
+		zap.String("expected_module_type", expectedOutputModuleType),
+		zap.String("block_range", blockRange),
 	)
 
-	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPathArg))
-	pkg, err := manifest.NewReader(manifestPathArg).Read()
+	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPath))
+	pkg, err := manifest.NewReader(manifestPath).Read()
 	if err != nil {
 		return nil, fmt.Errorf("read manifest: %w", err)
 	}
@@ -77,28 +80,28 @@ func NewFromViper(
 		return nil, fmt.Errorf("create substreams moduel graph: %w", err)
 	}
 
-	outputModuleName := outputModuleNameArg
-	if outputModuleName == InferOutputModuleFromPackage {
+	resolvedOutputModuleName := outputModuleName
+	if resolvedOutputModuleName == InferOutputModuleFromPackage {
 		zlog.Debug("inferring module output name from package directly")
 		if pkg.SinkModule == "" {
 			return nil, fmt.Errorf("sink module is required in sink config")
 		}
 
-		outputModuleName = pkg.SinkModule
+		resolvedOutputModuleName = pkg.SinkModule
 	}
 
-	zlog.Info("validating output module", zap.String("module_name", outputModuleName))
-	module, err := graph.Module(outputModuleName)
+	zlog.Info("validating output module", zap.String("module_name", resolvedOutputModuleName))
+	module, err := graph.Module(resolvedOutputModuleName)
 	if err != nil {
-		return nil, fmt.Errorf("get output module %q: %w", outputModuleName, err)
+		return nil, fmt.Errorf("get output module %q: %w", resolvedOutputModuleName, err)
 	}
 	if module.GetKindMap() == nil {
-		return nil, fmt.Errorf("ouput module %q is *not* of  type 'Mapper'", outputModuleName)
+		return nil, fmt.Errorf("ouput module %q is *not* of  type 'Mapper'", resolvedOutputModuleName)
 	}
 
 	zlog.Info("validating output module type", zap.String("module_name", module.Name), zap.String("module_type", module.Output.Type))
 
-	unprefixedExpectedType, prefixedModuleType := sanitizeModuleType(expectedModuleType)
+	unprefixedExpectedType, prefixedModuleType := sanitizeModuleType(expectedOutputModuleType)
 	if module.Output.Type != prefixedModuleType {
 		unprefixedActualType, _ := sanitizeModuleType(module.Output.Type)
 		return nil, fmt.Errorf("sink only supports map module with output type %q but selected module %q output type is %q", unprefixedExpectedType, module.Name, unprefixedActualType)
@@ -108,12 +111,12 @@ func NewFromViper(
 	outputModuleHash := hashes.HashModule(pkg.Modules, module, graph)
 
 	apiToken := readAPIToken(cmd)
-	blockRange, err := readBlockRange(module, blockRangeArg)
+	resolvedBlockRange, err := readBlockRange(module, blockRange)
 	if err != nil {
 		return nil, fmt.Errorf("resolve block range: %w", err)
 	}
 
-	zlog.Debug("resolved block range", zap.Stringer("range", blockRange))
+	zlog.Debug("resolved block range", zap.Stringer("range", resolvedBlockRange))
 
 	undoBufferSize := sflags.MustGetInt(cmd, "undo-buffer-size")
 	liveBlockTimeDelta := sflags.MustGetDuration(cmd, "live-block-time-delta")
@@ -126,7 +129,7 @@ func NewFromViper(
 	}
 
 	clientConfig := client.NewSubstreamsClientConfig(
-		endpointArg,
+		endpoint,
 		apiToken,
 		sflags.MustGetBool(cmd, "insecure"),
 		sflags.MustGetBool(cmd, "plaintext"),
@@ -154,8 +157,8 @@ func NewFromViper(
 		defaultSinkOptions = append(defaultSinkOptions, WithFinalBlocksOnly())
 	}
 
-	if blockRange != nil {
-		defaultSinkOptions = append(defaultSinkOptions, WithBlockRange(blockRange))
+	if resolvedBlockRange != nil {
+		defaultSinkOptions = append(defaultSinkOptions, WithBlockRange(resolvedBlockRange))
 	}
 
 	return New(

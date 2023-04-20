@@ -9,17 +9,27 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type sinkerHandlers struct {
+	handleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error
+	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error
+}
+
+func (h sinkerHandlers) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error {
+	return h.handleBlockScopedData(ctx, data, isLive, cursor)
+}
+
+func (h sinkerHandlers) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error {
+	return h.handleBlockUndoSignal(ctx, undoSignal, cursor)
+}
+
 func NewSinkerHandlers(
 	handleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error,
 	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error,
-) SinkerHandlers {
-	return SinkerHandlers{
-		HandleBlockScopedData: handleBlockScopedData,
-		HandleBlockUndoSignal: handleBlockUndoSignal,
-	}
+) SinkerHandler {
+	return sinkerHandlers{handleBlockScopedData, handleBlockUndoSignal}
 }
 
-type SinkerHandlers struct {
+type SinkerHandler interface {
 	// HandleBlockScopedData defines the callback that will handle Substreams `BlockScopedData` messages.
 	//
 	// The handler receives the following arguments:
@@ -34,7 +44,7 @@ type SinkerHandlers struct {
 	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `sink.NewRetryableError(err)` to notify
 	// the [Sinker] that it should retry from last valid cursor. It's your responsibility to ensure no data was persisted prior the
 	// the error.
-	HandleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error
+	HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error
 
 	// HandleBlockUndoSignal defines the callback that will handle Substreams `BlockUndoSignal` messages.
 	//
@@ -50,21 +60,7 @@ type SinkerHandlers struct {
 	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `sink.NewRetryableError(err)` to notify
 	// the [Sinker] that it should retry from last valid cursor. It's your responsibility to ensure no data was persisted prior the
 	// the error.
-	HandleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error
-}
-
-func (s SinkerHandlers) String() string {
-	dataHandlerState := "defined"
-	if s.HandleBlockScopedData == nil {
-		dataHandlerState = "undefined"
-	}
-
-	undoHandlerState := "defined"
-	if s.HandleBlockUndoSignal == nil {
-		undoHandlerState = "undefined"
-	}
-
-	return fmt.Sprintf("HandleBlockScopedData: %s, HandleBlockUndoSignal: %s", dataHandlerState, undoHandlerState)
+	HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error
 }
 
 type Cursor struct {

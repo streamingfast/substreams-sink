@@ -122,7 +122,7 @@ func (s *Sinker) OutputModuleName() string {
 	return s.outputModule.Name
 }
 
-func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handlers SinkerHandlers) {
+func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {
 	s.OnTerminating(func(_ error) {
 		s.stats.LogNow()
 		s.logger.Info("sinker terminating")
@@ -146,7 +146,7 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handlers SinkerHandler
 	}
 
 	s.logger.Info("starting sinker", fields...)
-	lastCursor, err := s.run(ctx, cursor, handlers)
+	lastCursor, err := s.run(ctx, cursor, handler)
 	if err == nil {
 		s.logger.Info("substreams ended correctly, reached your stop block", zap.Stringer("last_block_seen", lastCursor.Block()))
 	}
@@ -161,15 +161,7 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handlers SinkerHandler
 	s.Shutdown(shutdownErr)
 }
 
-func (s *Sinker) run(ctx context.Context, cursor *Cursor, handlers SinkerHandlers) (activeCursor *Cursor, err error) {
-	if handlers.HandleBlockScopedData == nil {
-		return cursor, fmt.Errorf("block scope data hanlder not set")
-	}
-
-	if !s.finalBlocksOnly && handlers.HandleBlockUndoSignal == nil {
-		return activeCursor, fmt.Errorf("requesting non-final block and block undo signal handler is not set")
-	}
-
+func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler) (activeCursor *Cursor, err error) {
 	activeCursor = cursor
 	adjustedRange := s.adjustStreamRange()
 
@@ -209,7 +201,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handlers SinkerHandler
 		}
 
 		var receivedMessage bool
-		activeCursor, receivedMessage, err = s.doRequest(ctx, activeCursor, req, ssClient, callOpts, handlers)
+		activeCursor, receivedMessage, err = s.doRequest(ctx, activeCursor, req, ssClient, callOpts, handler)
 
 		// If we received at least one message, we must reset the backoff
 		if receivedMessage {
@@ -274,7 +266,7 @@ func (s *Sinker) doRequest(
 	req *pbsubstreamsrpc.Request,
 	ssClient pbsubstreamsrpc.StreamClient,
 	callOpts []grpc.CallOption,
-	handlers SinkerHandlers,
+	handler SinkerHandler,
 ) (
 	*Cursor,
 	bool,
@@ -369,7 +361,7 @@ func (s *Sinker) doRequest(
 					}
 				}
 
-				if err := handlers.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {
+				if err := handler.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {
 					return activeCursor, receivedMessage, fmt.Errorf("handle BlockScopedData message: %w", err)
 				}
 			}
@@ -395,7 +387,7 @@ func (s *Sinker) doRequest(
 			HeadBlockNumber.SetUint64(block.Num())
 
 			if s.buffer == nil {
-				if err := handlers.HandleBlockUndoSignal(ctx, r.BlockUndoSignal, activeCursor); err != nil {
+				if err := handler.HandleBlockUndoSignal(ctx, r.BlockUndoSignal, activeCursor); err != nil {
 					return activeCursor, receivedMessage, fmt.Errorf("handle BlockUndoSignal: %w", err)
 				}
 			} else {
