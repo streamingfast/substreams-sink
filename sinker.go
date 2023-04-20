@@ -23,12 +23,17 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+// InferOutputModuleFromPackage can be used instead of the actual module's output name
+// and has the effect that output module is extracted directly from the [pbsubstreams.Package]
+// via the `SinkModule` field.
+const InferOutputModuleFromPackage string = "@!##_InferOutputModuleFromSpkg_##!@"
+
 type Sinker struct {
 	*shutter.Shutter
 
 	// Constructor (ordered)
 	mode             SubstreamsMode
-	modules          *pbsubstreams.Modules
+	pkg              *pbsubstreams.Package
 	outputModule     *pbsubstreams.Module
 	outputModuleHash string
 	clientConfig     *client.SubstreamsClientConfig
@@ -48,7 +53,7 @@ type Sinker struct {
 
 func New(
 	mode SubstreamsMode,
-	modules *pbsubstreams.Modules,
+	pkg *pbsubstreams.Package,
 	outputModule *pbsubstreams.Module,
 	hash manifest.ModuleHash,
 	clientConfig *client.SubstreamsClientConfig,
@@ -59,7 +64,7 @@ func New(
 	s := &Sinker{
 		Shutter:          shutter.New(),
 		clientConfig:     clientConfig,
-		modules:          modules,
+		pkg:              pkg,
 		outputModule:     outputModule,
 		outputModuleHash: hex.EncodeToString(hash),
 		mode:             mode,
@@ -74,7 +79,7 @@ func New(
 
 	s.logger.Info("sinker configured",
 		zap.Stringer("mode", s.mode),
-		zap.Int("module_count", len(s.modules.Modules)),
+		zap.Int("module_count", len(s.pkg.Modules.Modules)),
 		zap.String("output_module_name", s.OutputModuleName()),
 		zap.String("output_module_type", s.outputModule.Output.Type),
 		zap.String("output_module_hash", s.outputModuleHash),
@@ -99,6 +104,10 @@ func (s *substramsClientStringer) String() string {
 
 func (s *Sinker) BlockRange() *bstream.Range {
 	return s.blockRange
+}
+
+func (s *Sinker) Package() *pbsubstreams.Package {
+	return s.pkg
 }
 
 func (s *Sinker) OutputModule() *pbsubstreams.Module {
@@ -194,7 +203,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handlers SinkerHandler
 			StopBlockNum:    stopBlock,
 			StartCursor:     activeCursor.String(),
 			FinalBlocksOnly: s.finalBlocksOnly,
-			Modules:         s.modules,
+			Modules:         s.pkg.Modules,
 			OutputModule:    s.outputModule.Name,
 			ProductionMode:  s.mode == SubstreamsModeProduction,
 		}

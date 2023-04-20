@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
@@ -45,10 +46,14 @@ func AddFlagsToSet(flags *pflag.FlagSet) {
 }
 
 // NewFromViper constructs a new Sinker instance from a fixed set of "known" flags.
+//
+// If you want to extract the sink output module's name directly from the Substreams
+// package, if supported by your sink, instead of an actual name for paramater
+// `outputModuleNameArg`, use `sink.InferOutputModuleFromPackage`.
 func NewFromViper(
+	cmd *cobra.Command,
 	expectedModuleType string,
 	endpointArg, manifestPathArg, outputModuleNameArg, blockRangeArg string,
-	flagPrefix string,
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 	opts ...Option,
@@ -72,13 +77,23 @@ func NewFromViper(
 		return nil, fmt.Errorf("create substreams moduel graph: %w", err)
 	}
 
-	zlog.Info("validating output module", zap.String("module_name", outputModuleNameArg))
-	module, err := graph.Module(outputModuleNameArg)
+	outputModuleName := outputModuleNameArg
+	if outputModuleName == InferOutputModuleFromPackage {
+		zlog.Debug("inferring module output name from package directly")
+		if pkg.SinkModule == "" {
+			return nil, fmt.Errorf("sink module is required in sink config")
+		}
+
+		outputModuleName = pkg.SinkModule
+	}
+
+	zlog.Info("validating output module", zap.String("module_name", outputModuleName))
+	module, err := graph.Module(outputModuleName)
 	if err != nil {
-		return nil, fmt.Errorf("get output module %q: %w", outputModuleNameArg, err)
+		return nil, fmt.Errorf("get output module %q: %w", outputModuleName, err)
 	}
 	if module.GetKindMap() == nil {
-		return nil, fmt.Errorf("ouput module %q is *not* of  type 'Mapper'", outputModuleNameArg)
+		return nil, fmt.Errorf("ouput module %q is *not* of  type 'Mapper'", outputModuleName)
 	}
 
 	zlog.Info("validating output module type", zap.String("module_name", module.Name), zap.String("module_type", module.Output.Type))
@@ -92,7 +107,7 @@ func NewFromViper(
 	hashes := manifest.NewModuleHashes()
 	outputModuleHash := hashes.HashModule(pkg.Modules, module, graph)
 
-	apiToken := readAPIToken(flagPrefix)
+	apiToken := readAPIToken(cmd)
 	blockRange, err := readBlockRange(module, blockRangeArg)
 	if err != nil {
 		return nil, fmt.Errorf("resolve block range: %w", err)
@@ -100,21 +115,21 @@ func NewFromViper(
 
 	zlog.Debug("resolved block range", zap.Stringer("range", blockRange))
 
-	undoBufferSize := viper.GetInt(flagPrefix + "-undo-buffer-size")
-	liveBlockTimeDelta := viper.GetDuration(flagPrefix + "-live-block-time-delta")
-	isDevelopmentMode := viper.GetBool(flagPrefix + "-development-mode")
-	infiniteRetry := viper.GetBool(flagPrefix + "-infinite-retry")
+	undoBufferSize := sflags.MustGetInt(cmd, "undo-buffer-size")
+	liveBlockTimeDelta := sflags.MustGetDuration(cmd, "live-block-time-delta")
+	isDevelopmentMode := sflags.MustGetBool(cmd, "development-mode")
+	infiniteRetry := sflags.MustGetBool(cmd, "infinite-retry")
 
-	finalBlocksOnly := viper.GetBool(flagPrefix + "-final-blocks-only")
-	if !viper.IsSet(flagPrefix + "-final-blocks-only") {
-		finalBlocksOnly = viper.GetBool(flagPrefix + "-irreversible-only")
+	finalBlocksOnly, isSet := sflags.MustGetBoolProvided(cmd, "final-blocks-only")
+	if !isSet {
+		finalBlocksOnly = sflags.MustGetBool(cmd, "irreversible-only")
 	}
 
 	clientConfig := client.NewSubstreamsClientConfig(
 		endpointArg,
 		apiToken,
-		viper.GetBool(flagPrefix+"-insecure"),
-		viper.GetBool(flagPrefix+"-plaintext"),
+		sflags.MustGetBool(cmd, "insecure"),
+		sflags.MustGetBool(cmd, "plaintext"),
 	)
 
 	mode := SubstreamsModeProduction
@@ -145,7 +160,7 @@ func NewFromViper(
 
 	return New(
 		mode,
-		pkg.Modules,
+		pkg,
 		module,
 		outputModuleHash,
 		clientConfig,
@@ -215,13 +230,8 @@ func resolveBlockNumber(value int64, defaultIfNegative int64, relative bool, aga
 	return int64(against) + value
 }
 
-func readAPIToken(flagPrefix string) string {
-	apiToken := viper.GetString(flagPrefix + "api-token")
-	if apiToken != "" {
-		return apiToken
-	}
-
-	apiToken = os.Getenv("SUBSTREAMS_API_TOKEN")
+func readAPIToken(cmd *cobra.Command) string {
+	apiToken := os.Getenv("SUBSTREAMS_API_TOKEN")
 	if apiToken != "" {
 		return apiToken
 	}
