@@ -101,9 +101,9 @@ func NewFromViper(
 
 	zlog.Info("validating output module type", zap.String("module_name", module.Name), zap.String("module_type", module.Output.Type))
 
-	unprefixedExpectedType, prefixedModuleType := sanitizeModuleType(expectedOutputModuleType)
-	if module.Output.Type != prefixedModuleType {
-		unprefixedActualType, _ := sanitizeModuleType(module.Output.Type)
+	unprefixedExpectedType, prefixedExpectedType := sanitizeModuleType(expectedOutputModuleType)
+	unprefixedActualType, prefixedActualType := sanitizeModuleType(module.Output.Type)
+	if prefixedActualType != prefixedExpectedType {
 		return nil, fmt.Errorf("sink only supports map module with output type %q but selected module %q output type is %q", unprefixedExpectedType, module.Name, unprefixedActualType)
 	}
 
