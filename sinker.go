@@ -130,14 +130,14 @@ func (s *Sinker) OutputModuleName() string {
 // OutputModuleTypePrefixed returns the prefixed output module's type so the type
 // will always be prefixed with "proto:".
 func (s *Sinker) OutputModuleTypePrefixed() (prefixed string) {
-	prefixed, _ = sanitizeModuleType(s.outputModule.Output.Type)
+	_, prefixed = sanitizeModuleType(s.outputModule.Output.Type)
 	return
 }
 
 // OutputModuleTypeUnprefixed returns the unprefixed output module's type so the type
 // will **never** be prefixed with "proto:".
 func (s *Sinker) OutputModuleTypeUnprefixed() (unprefixed string) {
-	_, unprefixed = sanitizeModuleType(s.outputModule.Output.Type)
+	unprefixed, _ = sanitizeModuleType(s.outputModule.Output.Type)
 	return
 }
 

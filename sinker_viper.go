@@ -250,7 +250,7 @@ func readAPIToken() string {
 // - `sanitizeModuleType("com.acme") == (com.acme, proto:com.acme)`
 // - `sanitizeModuleType("proto:com.acme") == (com.acme, proto:com.acme)`
 func sanitizeModuleType(in string) (unprefixed, prefixed string) {
-	if strings.HasPrefix("proto:", in) {
+	if strings.HasPrefix(in, "proto:") {
 		return strings.TrimPrefix(in, "proto:"), in
 	}
 
