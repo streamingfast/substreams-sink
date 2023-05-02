@@ -34,7 +34,7 @@ Now the signalling will be like:
 1. `BlockUndoSignal` (Block #5a, Cursor `a'`)
 1. `BlockScopedData` (Block #6a, Cursor `e`)
 
-Now a `BlockUndoSignal` must be treated as "delete every data that has been recorded after block height specified by block in BlockUndoSignal". In the example above, this means we must delete changes done by `Block #7b` and `Block #6b`. The exact details depends on your own logic. If for example all your added record contain a block number, a simple way is to do `delete all records where block_num > 5` which is the block num received in the `BlockUndoSignal`.
+Now a `BlockUndoSignal` must be treated as "delete every data that has been recorded after block height specified by block in BlockUndoSignal". In the example above, this means we must delete changes done by `Block #7b` and `Block #6b`. The exact details depends on your own logic. If for example all your added record contain a block number, a simple way is to do `delete all records where block_num > 5` which is the block num received in the `BlockUndoSignal` (this is true for append only records, so when only `INSERT` are allowed).
 
 The `pbsubstreams.ForkStep` has been removed completely. The default behavior is to send `pbsubstreamsrpc.BlockScopedData` and `pbsubstreamsprc.BlockUndoSignal` which corresponds to old `ForkStepNew` and `ForkStepUndo`. The `ForkStepIrreversible` are not sent anymore. Instead, the `pbsubstreamsrpc.BlockScopedData` message gained a filed `FinalBlockHeight` which determines for the received block at which block height Substreams is considering blocks to be final. If you wish to only receive final blocks, you can use `sink.WithFinalBlocksOnly` sinker `Option`.
 
