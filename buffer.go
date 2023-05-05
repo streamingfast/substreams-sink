@@ -2,190 +2,145 @@ package sink
 
 import (
 	"fmt"
-	"sort"
-	"sync"
 
+	"github.com/streamingfast/bstream"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type bufferKey string
-
-func newBufferKey(blockNum uint64, blockId string, forkStep pbsubstreams.ForkStep) bufferKey {
-	return bufferKey(fmt.Sprintf("%d-%s-%s", blockNum, blockId, forkStep))
-}
-
+// blockDataBuffer is expected to be used synchronously from a single
+// goroutine, concurrent access is **not** implemented.
+//
+// When you see "final" in the context of this implementation, we talk
+// about our internal "fake" finality which happens once enough block
+// has "passed" which is the size of the undo block size
 type blockDataBuffer struct {
-	size              int
-	irrIdx            int
-	lastBlockReturned uint64
+	// data is kept striclty ordered and its ordering must be respected
+	// throughout the implementation.
+	//
+	// The array is always fully allocated, but the `dataEmptyAt` determines
+	// where we have actual unallocated space.
+	data []*pbsubstreamsrpc.BlockScopedData
 
-	index *dataIndex
+	// We manage manually the offset at which we have space to add new block.
+	dataEmptyAt int
 
-	data []*pbsubstreams.BlockScopedData
-
-	mu sync.RWMutex
+	lastEmittedBlock bstream.BlockRef
 }
 
 func newBlockDataBuffer(size int) *blockDataBuffer {
 	return &blockDataBuffer{
-		size:  size,
-		index: newDataIndex(),
-		data:  make([]*pbsubstreams.BlockScopedData, 0, size),
+		data:             make([]*pbsubstreamsrpc.BlockScopedData, size),
+		dataEmptyAt:      0,
+		lastEmittedBlock: nil,
 	}
 }
 
-func (b *blockDataBuffer) AddBlockData(blockData *pbsubstreams.BlockScopedData) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	switch blockData.Step {
-	case pbsubstreams.ForkStep_STEP_NEW:
-		return b.handleNew(blockData)
-	case pbsubstreams.ForkStep_STEP_IRREVERSIBLE:
-		return b.handleIrreversible(blockData)
-	case pbsubstreams.ForkStep_STEP_UNDO:
-		return b.handleUndo(blockData)
+func (b *blockDataBuffer) HandleBlockScopedData(blockData *pbsubstreamsrpc.BlockScopedData) (finalBlocks []*pbsubstreamsrpc.BlockScopedData, err error) {
+	// We have one element already in, validate that received block is strictly ordered
+	if b.dataEmptyAt != 0 {
+		highestBlock := b.data[b.dataEmptyAt-1]
+		if blockData.Clock.Number <= highestBlock.Clock.Number {
+			return nil, fmt.Errorf("received new block scoped data (Block %s) whose height is lower or equal than our most recent block (Block %s)", blockToRef(blockData), blockToRef(highestBlock))
+		}
 	}
 
-	return fmt.Errorf("unknown fork step %s", blockData.Step)
-}
+	lastFinalBlockAt := b.findOldestFinalBlockIndex(blockData.FinalBlockHeight)
 
-func (b *blockDataBuffer) GetBlockData() ([]*pbsubstreams.BlockScopedData, error) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+	dataContainsFinalBlocks := lastFinalBlockAt != -1
+	isFullCapacity := b.dataEmptyAt == len(b.data)
 
-	var blocks []*pbsubstreams.BlockScopedData
-
-	if len(b.data) >= b.size {
-		ix := len(b.data) - b.size
-		if b.irrIdx > ix {
-			ix = b.irrIdx
+	if isFullCapacity || dataContainsFinalBlocks {
+		// We are at full capacity and no block is final now, assume oldest block is now final
+		if lastFinalBlockAt == -1 {
+			lastFinalBlockAt = 0
 		}
 
-		blocks = b.data[:ix]
-		b.data = b.data[ix:]
-		b.irrIdx = 0
-	} else if b.irrIdx != 0 {
-		blocks = b.data[0:b.irrIdx]
-		b.data = b.data[b.irrIdx:]
-		b.irrIdx = 0
+		// We perform a copy of the array slice because we are about to shift it, modifying it in-place, we add plus 1 to allow received blockData itself to be added if needed
+		finalBlockCount := lastFinalBlockAt + 1
+		finalBlocks = make([]*pbsubstreamsrpc.BlockScopedData, 0, finalBlockCount+1)
+		finalBlocks = append(finalBlocks, b.data[0:finalBlockCount]...)
+
+		// Shifts non-final blocks at the beginning of the array
+		for i := lastFinalBlockAt + 1; i < b.dataEmptyAt; i++ {
+			b.data[i-finalBlockCount] = b.data[i]
+		}
+
+		b.dataEmptyAt = b.dataEmptyAt - finalBlockCount
+		b.lastEmittedBlock = blockToRef(finalBlocks[len(finalBlocks)-1])
 	}
 
-	if len(blocks) > 0 {
-		b.lastBlockReturned = blocks[len(blocks)-1].Clock.Number
-		keysToDelete := make([]bufferKey, 0, len(blocks))
-		for _, blk := range blocks {
-			k := newBufferKey(blk.Clock.Number, blk.Clock.Id, blk.Step)
-			keysToDelete = append(keysToDelete, k)
-		}
-		b.index.DeleteMany(keysToDelete...)
+	// If the block received is itself final, we add it to the final blocks array, otherwise, we process as normal
+	isReceivedBlockFinal := blockData.Clock.Number <= blockData.FinalBlockHeight
+
+	if isReceivedBlockFinal {
+		finalBlocks = append(finalBlocks, blockData)
+	} else {
+		b.data[b.dataEmptyAt] = blockData
+		b.dataEmptyAt += 1
 	}
-	return blocks, nil
+
+	return finalBlocks, nil
 }
 
-func (b *blockDataBuffer) handleUndo(blockData *pbsubstreams.BlockScopedData) error {
-	if len(b.data) == 0 {
+func (b *blockDataBuffer) HandleBlockUndoSignal(undoSignal *pbsubstreamsrpc.BlockUndoSignal) error {
+	lastValidBlock := asBlockRef(undoSignal.LastValidBlock)
+
+	if b.lastEmittedBlock != nil && b.lastEmittedBlock.Num() >= lastValidBlock.Num() {
+		// We might have actually sent exactly the last valid block, in which case no error should occur since the chain
+		// ordering is respected
+		if !bstream.EqualsBlockRefs(b.lastEmittedBlock, lastValidBlock) {
+			return fmt.Errorf("cannot undo down to last valid Block %s because we already sent you Block %s which is after last valid block", lastValidBlock, b.lastEmittedBlock)
+		}
+	}
+
+	// There is nothing to do, we are already emptied due to a previous undo signal
+	if b.dataEmptyAt == 0 {
 		return nil
 	}
 
-	if b.lastBlockReturned >= blockData.Clock.Number {
-		return fmt.Errorf("cannot undo block %d, last block returned is %d", blockData.Clock.Number, b.lastBlockReturned)
-	}
+	// If last valid block is not found, `dataEmptyAt` will become 0 (-1 + 1) which "clears" all our block
+	b.dataEmptyAt = b.findNewestValidBlockIndex(lastValidBlock.Num()) + 1
+	return nil
+}
 
-	for i := len(b.data) - 1; i >= 0; i-- {
-		if b.data[i].Clock.Number >= blockData.Clock.Number {
-			k := newBufferKey(b.data[i].Clock.Number, b.data[i].Clock.Id, b.data[i].Step)
-			b.index.Delete(k)
-
-			b.data = b.data[0:i]
-		} else {
+func (b *blockDataBuffer) findNewestValidBlockIndex(lastValidBlockHeight uint64) int {
+	newestValidBlockAt := -1
+	for i := b.dataEmptyAt - 1; i >= 0; i-- {
+		if b.data[i].Clock.Number <= lastValidBlockHeight {
+			newestValidBlockAt = i
 			break
 		}
 	}
 
-	return nil
+	return newestValidBlockAt
 }
 
-func (b *blockDataBuffer) handleNew(blockData *pbsubstreams.BlockScopedData) error {
-	k := newBufferKey(blockData.Clock.Number, blockData.Clock.Id, blockData.Step)
-	if b.index.Exists(k) {
-		return nil
+func (b *blockDataBuffer) findOldestFinalBlockIndex(finalHeight uint64) int {
+	oldestFinalBlockAt := -1
+	for i := 0; i < b.dataEmptyAt; i++ {
+		if finalHeight < b.data[i].Clock.Number {
+			break
+		}
+
+		oldestFinalBlockAt = i
 	}
 
-	b.data = append(b.data, blockData)
-	b.index.Set(k)
-
-	sort.Slice(b.data, func(i, j int) bool {
-		return b.data[i].Clock.Number < b.data[j].Clock.Number
-	})
-
-	return nil
+	return oldestFinalBlockAt
 }
 
-func (b *blockDataBuffer) handleIrreversible(blockData *pbsubstreams.BlockScopedData) error {
-	k := newBufferKey(blockData.Clock.Number, blockData.Clock.Id, blockData.Step)
-	if b.index.Exists(k) {
-		return nil
-	}
-
-	b.data = append(b.data, blockData)
-	b.irrIdx = len(b.data)
-	b.index.Set(k)
-
-	sort.Slice(b.data, func(i, j int) bool {
-		return b.data[i].Clock.Number < b.data[j].Clock.Number
-	})
-
-	return nil
+func (b *blockDataBuffer) Capacity() int {
+	return len(b.data)
 }
 
-type dataIndex struct {
-	ix map[bufferKey]bool
-
-	mu sync.RWMutex
+func blockToRef(blockScopedData *pbsubstreamsrpc.BlockScopedData) bstream.BlockRef {
+	return clockToBlockRef(blockScopedData.Clock)
 }
 
-func newDataIndex() *dataIndex {
-	return &dataIndex{
-		ix: make(map[bufferKey]bool),
-	}
+func asBlockRef(blockRef *pbsubstreams.BlockRef) bstream.BlockRef {
+	return bstream.NewBlockRef(blockRef.Id, blockRef.Number)
 }
 
-func newDataIndexWithKeys(keys ...bufferKey) *dataIndex {
-	ix := newDataIndex()
-	for _, k := range keys {
-		ix.Set(k)
-	}
-	return ix
-}
-
-func (i *dataIndex) Exists(key bufferKey) bool {
-	i.mu.RLock()
-	defer i.mu.RUnlock()
-
-	_, ok := i.ix[key]
-	return ok
-}
-
-func (i *dataIndex) Set(key bufferKey) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	i.ix[key] = true
-}
-
-func (i *dataIndex) Delete(key bufferKey) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	delete(i.ix, key)
-}
-
-func (i *dataIndex) DeleteMany(keys ...bufferKey) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	for _, k := range keys {
-		delete(i.ix, k)
-	}
+func clockToBlockRef(clock *pbsubstreams.Clock) bstream.BlockRef {
+	return bstream.NewBlockRef(clock.Id, clock.Number)
 }
