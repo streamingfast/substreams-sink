@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bobg/go-generics/v2/slices"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/bstream"
@@ -17,6 +18,31 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
+
+const (
+	FlagInsecure           = "insecure"
+	FlagPlaintext          = "plaintext"
+	FlagUndoBufferSize     = "undo-buffer-size"
+	FlagLiveBlockTimeDelta = "live-block-time-delta"
+	FlagDevelopmentMode    = "development-mode"
+	FlagFinalBlocksOnly    = "final-blocks-only"
+	FlagInfiniteRetry      = "infinite-retry"
+	FlagIrreversibleOnly   = "irreversible-only"
+)
+
+func FlagIgnore(in ...string) FlagIgnored {
+	return flagIgnoredList(in)
+}
+
+type FlagIgnored interface {
+	IsIgnored(flag string) bool
+}
+
+type flagIgnoredList []string
+
+func (i flagIgnoredList) IsIgnored(flag string) bool {
+	return slices.Contains(i, flag)
+}
 
 // AddFlagsToSet can be used to import standard flags needed for sink to configure itself. By using
 // this method to define your flag and using `cli.ConfigureViper` (import "github.com/streamingfast/cli")
@@ -31,18 +57,48 @@ import (
 //	Flag `--development-mode` (defaults `false`)
 //	Flag `--final-blocks-only` (defaults `false`)
 //	Flag `--infinite-retry` (defaults `false`)
-func AddFlagsToSet(flags *pflag.FlagSet) {
-	flags.BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
-	flags.BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
-	flags.Int("undo-buffer-size", 12, "Number of blocks to keep buffered to handle fork reorganizations")
-	flags.Duration("live-block-time-delta", 300*time.Second, "Consider chain live if block time is within this number of seconds of current time")
-	flags.Bool("development-mode", false, "Enable development mode, use it for testing purpose only, should not be used for production workload")
-	flags.Bool("final-blocks-only", false, "Get only final blocks")
-	flags.Bool("infinite-retry", false, "Default behavior is to retry 15 times spanning approximatively 5m before exiting with an error, activating this flag will retry forever")
+//
+// The `ignore` field can be used to multiple times to avoid adding the specified
+// `flags` to the the set. This can be used for example to avoid adding `--final-blocks-only`
+// when the sink is always final only.
+//
+//	AddFlagsToSet(flags, sink.FlagIgnore(sink.FlagFinalBlocksOnly))
+func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
+	flagIncluded := func(x string) bool { return every(ignore, func(e FlagIgnored) bool { return !e.IsIgnored(x) }) }
 
-	// Deprecated flags
-	flags.Bool("irreversible-only", false, "Get only irreversible blocks")
-	flags.Lookup("irreversible-only").Deprecated = "Renamed to --final-blocks-only"
+	if flagIncluded(FlagInsecure) {
+		flags.BoolP(FlagInsecure, "k", false, "Skip certificate validation on GRPC connection")
+	}
+
+	if flagIncluded(FlagPlaintext) {
+		flags.BoolP(FlagPlaintext, "p", false, "Establish GRPC connection in plaintext")
+	}
+
+	if flagIncluded(FlagUndoBufferSize) {
+		flags.Int(FlagUndoBufferSize, 12, "Number of blocks to keep buffered to handle fork reorganizations")
+	}
+
+	if flagIncluded(FlagLiveBlockTimeDelta) {
+		flags.Duration(FlagLiveBlockTimeDelta, 300*time.Second, "Consider chain live if block time is within this number of seconds of current time")
+	}
+
+	if flagIncluded(FlagDevelopmentMode) {
+		flags.Bool(FlagDevelopmentMode, false, "Enable development mode, use it for testing purpose only, should not be used for production workload")
+	}
+
+	if flagIncluded(FlagFinalBlocksOnly) {
+		flags.Bool(FlagFinalBlocksOnly, false, "Get only final blocks")
+
+		if flagIncluded(FlagIrreversibleOnly) {
+			// Deprecated flags
+			flags.Bool(FlagIrreversibleOnly, false, "Get only irreversible blocks")
+			flags.Lookup(FlagIrreversibleOnly).Deprecated = "Renamed to --final-blocks-only"
+		}
+	}
+
+	if flagIncluded(FlagInfiniteRetry) {
+		flags.Bool(FlagInfiniteRetry, false, "Default behavior is to retry 15 times spanning approximatively 5m before exiting with an error, activating this flag will retry forever")
+	}
 }
 
 // NewFromViper constructs a new Sinker instance from a fixed set of "known" flags.
@@ -120,21 +176,13 @@ func NewFromViper(
 
 	zlog.Debug("resolved block range", zap.Stringer("range", resolvedBlockRange))
 
-	undoBufferSize := sflags.MustGetInt(cmd, "undo-buffer-size")
-	liveBlockTimeDelta := sflags.MustGetDuration(cmd, "live-block-time-delta")
-	isDevelopmentMode := sflags.MustGetBool(cmd, "development-mode")
-	infiniteRetry := sflags.MustGetBool(cmd, "infinite-retry")
-
-	finalBlocksOnly, isSet := sflags.MustGetBoolProvided(cmd, "final-blocks-only")
-	if !isSet {
-		finalBlocksOnly = sflags.MustGetBool(cmd, "irreversible-only")
-	}
+	undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly := getViperFlags(cmd)
 
 	clientConfig := client.NewSubstreamsClientConfig(
 		endpoint,
 		apiToken,
-		sflags.MustGetBool(cmd, "insecure"),
-		sflags.MustGetBool(cmd, "plaintext"),
+		sflags.MustGetBool(cmd, FlagInsecure),
+		sflags.MustGetBool(cmd, FlagPlaintext),
 	)
 
 	mode := SubstreamsModeProduction
@@ -173,6 +221,43 @@ func NewFromViper(
 		tracer,
 		append(defaultSinkOptions, opts...)...,
 	)
+}
+
+func getViperFlags(cmd *cobra.Command) (
+	undoBufferSize int,
+	liveBlockTimeDelta time.Duration,
+	isDevelopmentMode bool,
+	infiniteRetry bool,
+	finalBlocksOnly bool,
+) {
+	if sflags.FlagDefined(cmd, FlagUndoBufferSize) {
+		undoBufferSize = sflags.MustGetInt(cmd, FlagUndoBufferSize)
+	}
+
+	if sflags.FlagDefined(cmd, FlagLiveBlockTimeDelta) {
+		liveBlockTimeDelta = sflags.MustGetDuration(cmd, FlagLiveBlockTimeDelta)
+	}
+
+	if sflags.FlagDefined(cmd, FlagDevelopmentMode) {
+		isDevelopmentMode = sflags.MustGetBool(cmd, FlagDevelopmentMode)
+	}
+
+	if sflags.FlagDefined(cmd, FlagInfiniteRetry) {
+		infiniteRetry = sflags.MustGetBool(cmd, FlagInfiniteRetry)
+	}
+
+	var isSet bool
+	if sflags.FlagDefined(cmd, FlagFinalBlocksOnly) {
+		finalBlocksOnly, isSet = sflags.MustGetBoolProvided(cmd, FlagFinalBlocksOnly)
+	}
+
+	if !isSet {
+		if sflags.FlagDefined(cmd, FlagIrreversibleOnly) {
+			finalBlocksOnly = sflags.MustGetBool(cmd, FlagIrreversibleOnly)
+		}
+	}
+
+	return
 }
 
 // parseNumber parses a number and indicates whether the number is relative, meaning it starts with a +
@@ -265,4 +350,14 @@ func (e expectedModuleType) String() string {
 	}
 
 	return string(e)
+}
+
+func every[E any](s []E, test func(e E) bool) bool {
+	for _, element := range s {
+		if !test(element) {
+			return false
+		}
+	}
+
+	return true
 }

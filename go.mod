@@ -7,7 +7,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/spf13/cobra v1.6.1
 	github.com/streamingfast/bstream v0.0.2-0.20230407143220-06c919ae8476
-	github.com/streamingfast/cli v0.0.4-0.20230420050158-aee4f9637f40
+	github.com/streamingfast/cli v0.0.4-0.20230508203625-ecd532feb120
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/logging v0.0.0-20221209193439-bff11742bf4c
 	github.com/streamingfast/shutter v1.5.0
