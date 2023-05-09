@@ -355,18 +355,18 @@ func (s *Sinker) doRequest(
 			HeadBlockNumber.SetUint64(block.Num())
 			DataMessageCount.Inc()
 
+			cursor, err := NewCursor(r.BlockScopedData.Cursor)
+			if err != nil {
+				return activeCursor, receivedMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
+			}
+
+			activeCursor = cursor
+
 			var dataToProcess []*pbsubstreamsrpc.BlockScopedData
 			if s.buffer == nil {
 				// No buffering, process directly
 				dataToProcess = []*pbsubstreamsrpc.BlockScopedData{r.BlockScopedData}
 			} else {
-				cursor, err := NewCursor(r.BlockScopedData.Cursor)
-				if err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
-				}
-
-				activeCursor = cursor
-
 				dataToProcess, err = s.buffer.HandleBlockScopedData(r.BlockScopedData)
 				if err != nil {
 					return activeCursor, receivedMessage, fmt.Errorf("buffer add block data: %w", err)
