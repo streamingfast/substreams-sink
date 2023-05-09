@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
 * Added possibility to ignore flag to set when using `sink.AddFlagsToSet`, for example:
 
   ```go
   sink.AddFlagsToSet(flags, sink.FlagIgnore(sink.FlagFinalBlocksOnly))
   ```
+
+### Changed
+
+* When specifying `WithFinalBlocksOnly()`, undo buffer is automatically sets to 0 (no buffering).
+
+### Fixed
 
 * Fixed bug when flag are ignored and not defined.
 

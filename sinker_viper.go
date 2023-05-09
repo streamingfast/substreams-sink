@@ -177,6 +177,10 @@ func NewFromViper(
 	zlog.Debug("resolved block range", zap.Stringer("range", resolvedBlockRange))
 
 	undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly := getViperFlags(cmd)
+	if finalBlocksOnly {
+		zlog.Debug("override undo buffer size to 0 since final blocks only is requested")
+		undoBufferSize = 0
+	}
 
 	clientConfig := client.NewSubstreamsClientConfig(
 		endpoint,

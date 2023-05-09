@@ -82,6 +82,11 @@ func New(
 		opt(s)
 	}
 
+	if s.finalBlocksOnly && s.buffer != nil {
+		s.logger.Debug("discarding undo buffer since final blocks only requested")
+		s.buffer = nil
+	}
+
 	s.logger.Info("sinker configured",
 		zap.Stringer("mode", s.mode),
 		zap.Int("module_count", len(s.pkg.Modules.Modules)),
