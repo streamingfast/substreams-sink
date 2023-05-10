@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.2.2
 
+### Fixed
+
+* Fixed `cursor` not being updated when sink has no undo buffer configured.
+
+### Added
+
 * Added possibility to disable block buffer by specifying `WithBlockDataBuffer(0)`.
 * Added possibility to call `sinker.ApiToken()` and `sinker.EndpointConfig()` to retrieve client configuration of the sinker instance.
 * Added new Prometheus metric `head_block_time_drift{service=substreams_sink}` to record the head block time drift against `now`.
