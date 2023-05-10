@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/proto"
 )
 
 // IgnoreOutputModuleType can be used instead of the expected output module type
@@ -146,6 +147,17 @@ func (s *Sinker) OutputModuleTypePrefixed() (prefixed string) {
 func (s *Sinker) OutputModuleTypeUnprefixed() (unprefixed string) {
 	unprefixed, _ = sanitizeModuleType(s.outputModule.Output.Type)
 	return
+}
+
+// EndpointConfig returns the endpoint configuration used by this sinker instance.
+func (s *Sinker) EndpointConfig() (endpoint string, plaintext bool, insecure bool) {
+	return s.clientConfig.Endpoint(), s.clientConfig.PlainText(), s.clientConfig.Insecure()
+}
+
+// ApiToken returns the currently defined ApiToken sets on this sinker instance, ""
+// is no api token was configured
+func (s *Sinker) ApiToken() string {
+	return s.clientConfig.JWT()
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {
@@ -301,7 +313,6 @@ func (s *Sinker) doRequest(
 	s.logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
 	receivedMessage := false
 
-	progressMessageCount := 0
 	stream, err := ssClient.Blocks(ctx, req, callOpts...)
 	if err != nil {
 		return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
@@ -330,12 +341,23 @@ func (s *Sinker) doRequest(
 		}
 
 		receivedMessage = true
+		MessageSizeBytes.AddInt(proto.Size(resp))
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreamsrpc.Response_Progress:
 			for _, module := range r.Progress.Modules {
-				progressMessageCount++
 				ProgressMessageCount.Inc(module.Name)
+
+				if processedRanges := module.GetProcessedRanges(); processedRanges != nil {
+					latestEndBlock := uint64(0)
+					for _, processedRange := range processedRanges.ProcessedRanges {
+						if processedRange.EndBlock > latestEndBlock {
+							latestEndBlock = processedRange.EndBlock
+						}
+					}
+
+					ProgressMessageLastEndBlock.SetUint64(latestEndBlock, module.Name)
+				}
 			}
 
 			if s.tracer.Enabled() {
@@ -353,7 +375,10 @@ func (s *Sinker) doRequest(
 			// We record our stats before the buffer action, so user sees state of "stream" and not state of buffer
 			s.stats.RecordBlock(block)
 			HeadBlockNumber.SetUint64(block.Num())
+			HeadBlockTimeDrift.SetBlockTime(r.BlockScopedData.Clock.Timestamp.AsTime())
 			DataMessageCount.Inc()
+			DataMessageSizeBytes.AddInt(proto.Size(r.BlockScopedData))
+			BackprocessingCompletion.SetUint64(1)
 
 			cursor, err := NewCursor(r.BlockScopedData.Cursor)
 			if err != nil {
@@ -411,6 +436,7 @@ func (s *Sinker) doRequest(
 			s.stats.RecordBlock(block)
 			UndoMessageCount.Inc()
 			HeadBlockNumber.SetUint64(block.Num())
+			// We don't have the block time in undo case for now, so we don't change it
 
 			if s.buffer == nil {
 				if err := handler.HandleBlockUndoSignal(ctx, r.BlockUndoSignal, activeCursor); err != nil {
@@ -436,6 +462,7 @@ func (s *Sinker) doRequest(
 
 		default:
 			s.logger.Info("received unknown type of message", zap.Reflect("message", r))
+			UnknownMessageCount.Inc()
 		}
 	}
 }

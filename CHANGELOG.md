@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v0.2.2
+
+* Added possibility to disable block buffer by specifying `WithBlockDataBuffer(0)`.
+* Added possibility to call `sinker.ApiToken()` and `sinker.EndpointConfig()` to retrieve client configuration of the sinker instance.
+* Added new Prometheus metric `head_block_time_drift{service=substreams_sink}` to record the head block time drift against `now`.
+* Added new Prometheus metric `substreams_sink_message_size_bytes` to record messages total bytes received from Substreams server.
+* Added new Prometheus metric `substreams_sink_data_message_size_bytes` to record `BlockScopedProgressData` messages total bytes received from Substreams server.
+* Added new Prometheus metric `substreams_sink_progress_message_last_end_block` to record received `ModuleProgress` reporting progress last processed block.
+* Added new Prometheus metric `substreams_sink_unknown_message` to record total message of unknown type received (could happen if server send messages that client don't understand due to version mistmatch).
+* Added new Prometheus metric `substreams_sink_backprocessing_completion` to record that backprocessing (if scheduled for your request is now completed, note that forward parallel execution could still be active).
+
+## v0.2.1
 
 ### Added
 

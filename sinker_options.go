@@ -10,12 +10,15 @@ type Option func(s *Sinker)
 // If the buffer is too small, the sinker will not be able to handle the reorganization and will error if an undo is received for a block which has already been returned to the sink.
 // If the buffer is too large, the sinker will take more time than necessary to write data to the sink.
 //
-// If the sink is configured to handle irreversible blocks, the default buffer size is 12.
-// If the sink is not configured to handle undo fork steps, the buffer is not used.
+// If the sink is configured to handle irreversible blocks, the default buffer size is 12. If
+// you pass 0, block data buffer will be disabled completely.
 func WithBlockDataBuffer(bufferSize int) Option {
 	return func(s *Sinker) {
-		buffer := newBlockDataBuffer(bufferSize)
-		s.buffer = buffer
+		if bufferSize == 0 {
+			s.buffer = nil
+		} else {
+			s.buffer = newBlockDataBuffer(bufferSize)
+		}
 	}
 }
 
