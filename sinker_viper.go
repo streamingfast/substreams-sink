@@ -265,53 +265,76 @@ func getViperFlags(cmd *cobra.Command) (
 }
 
 // parseNumber parses a number and indicates whether the number is relative, meaning it starts with a +
-func parseNumber(number string) (int64, bool, error) {
-	numberIsRelative := strings.HasPrefix(number, "+")
-	numberInt64, err := strconv.ParseInt(strings.TrimPrefix(number, "+"), 0, 64)
-	if err != nil {
-		return 0, false, fmt.Errorf("invalid block number value: %w", err)
+func parseNumber(number string) (numberInt64 int64, numberIsEmpty bool, numberIsRelative bool, err error) {
+	if number == "" {
+		numberIsEmpty = true
+		return
 	}
-	return numberInt64, numberIsRelative, nil
+
+	numberIsRelative = strings.HasPrefix(number, "+")
+	numberInt64, err = strconv.ParseInt(strings.TrimPrefix(number, "+"), 0, 64)
+	if err != nil {
+		return 0, false, false, fmt.Errorf("invalid block number value: %w", err)
+	}
+
+	return
 }
 
 func readBlockRange(module *pbsubstreams.Module, input string) (*bstream.Range, error) {
 	if input == "" {
-		input = "-1"
+		input = ":"
 	}
 
 	before, after, rangeHasStartAndStop := strings.Cut(input, ":")
 
-	beforeAsInt64, beforeIsRelative, err := parseNumber(before)
+	beforeAsInt64, beforeIsEmpty, beforeIsRelative, err := parseNumber(before)
 	if err != nil {
 		return nil, fmt.Errorf("parse number %q: %w", before, err)
 	}
 
-	afterIsRelative := false
-	afterAsInt64 := int64(0)
+	if beforeIsEmpty {
+		// We become automatically relative to module start block with +0, so we get back module's start block
+		beforeIsRelative = true
+	}
+
+	afterAsInt64, afterIsEmpty, afterIsRelative := int64(0), false, false
 	if rangeHasStartAndStop {
-		afterAsInt64, afterIsRelative, err = parseNumber(after)
+		afterAsInt64, afterIsEmpty, afterIsRelative, err = parseNumber(after)
 		if err != nil {
 			return nil, fmt.Errorf("parse number %q: %w", after, err)
 		}
-
 	}
 
-	// If there is no `:` we assume it's a stop block value right away
 	if !rangeHasStartAndStop {
+		// If there is no `:` we assume it's a stop block value right away
 		if beforeAsInt64 < 1 {
 			return bstream.NewOpenRange(module.InitialBlock), nil
 		}
+
 		start := module.InitialBlock
 		stop := resolveBlockNumber(beforeAsInt64, 0, beforeIsRelative, int64(start))
+
 		return bstream.NewRangeExcludingEnd(start, uint64(stop)), nil
-	}
+	} else {
+		// Otherwise, we have a `:` sign so we assume it's a start/stop range
+		start := resolveBlockNumber(beforeAsInt64, int64(module.InitialBlock), beforeIsRelative, int64(module.InitialBlock))
+		if afterAsInt64 == -1 {
+			return bstream.NewOpenRange(uint64(start)), nil
+		}
 
-	start := resolveBlockNumber(beforeAsInt64, int64(module.InitialBlock), beforeIsRelative, int64(module.InitialBlock))
-	if afterAsInt64 == -1 {
-		return bstream.NewOpenRange(uint64(start)), nil
-	}
+		startBlock := uint64(start)
+		if afterIsEmpty {
+			return bstream.NewOpenRange(startBlock), nil
+		}
 
-	return bstream.NewRangeExcludingEnd(uint64(start), uint64(resolveBlockNumber(afterAsInt64, 0, afterIsRelative, start))), nil
+		exclusiveEndBlock := uint64(resolveBlockNumber(afterAsInt64, 0, afterIsRelative, start))
+
+		if startBlock >= exclusiveEndBlock {
+			return nil, fmt.Errorf("invalid range: start block %d is equal or above stop block %d (exclusive)", startBlock, exclusiveEndBlock)
+		}
+
+		return bstream.NewRangeExcludingEnd(startBlock, exclusiveEndBlock), nil
+	}
 }
 
 func resolveBlockNumber(value int64, defaultIfNegative int64, relative bool, against int64) int64 {

@@ -51,6 +51,25 @@ The `BlockUndoSignalHandler` is called when a message `*pbsubstreamsrpc.BlockUnd
 
 How is the `*pbsubstreamsrpc.BlockUndoSignal` is actually is implementation dependent. The correct behavior is to treat every piece of data that is contained in a `BlockScopedData` whose `BlockScopedData.Clock.Number` is `> LastValidBlock.Number` as now invalid. For example, if all written entities have a block number, one handling possibility is to delete every entities where `blockNumber > LastValidBlock.Number`.
 
+#### From Viper
+
+Our sink(s) are all using Viper/Cobra and a set of public StreamingFast libraries to deal with flags, logging, environment variables, etc. If you use the same structure as us, you can benefits from `sink.AddFlagsToSet` and `sink.NewFromViper` which both performs most of the boilerplate to bootstrap a sinker from flags.
+
+##### Accepted Block Range
+
+Spec is loosely (assuming a module's start block of 5):
+
+- `<empty>` => `[5, ∞+`
+- `-1` => `[5, ∞+`
+- `:` => `[5, ∞+`
+- `10` => `[5, 10(`
+- `+10` => `[5, 15(`
+- `:+10` => `[5, 15(`
+- `+10:` => `[15, ∞+`
+- `10:15` => `[10, 15(`
+- `10:+10` => `[10, 20(`
+- `+10:+10` => `[15, 25(`
+
 ### Launching
 
 The sinker can be launched by calling the `Start` method on the `Sinker` object. The `Start` method will block until the sinker is stopped.
