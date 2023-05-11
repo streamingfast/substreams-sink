@@ -1,6 +1,9 @@
 package sink
 
-import "github.com/streamingfast/bstream"
+import (
+	"github.com/cenkalti/backoff/v4"
+	"github.com/streamingfast/bstream"
+)
 
 type Option func(s *Sinker)
 
@@ -31,13 +34,25 @@ func WithInfiniteRetry() Option {
 	}
 }
 
-// WithFinalBlocksOnly configures a the [Sinker] to which itself configurs the Substreams
-// gRPC stream to only send [pbsubstreamsrpc.BlockScopedData] once the block is final, this
-// means that `WithBlockDataBuffer` if used has is discarded and [BlockUndoSignalHandler]
+// WithFinalBlocksOnly configures the [Sinker] to only stream Substreams output that
+// is considered final by the Substreams backend server.
+//
+// This means that `WithBlockDataBuffer` if used is discarded and [BlockUndoSignalHandler]
 // will never be called.
 func WithFinalBlocksOnly() Option {
 	return func(s *Sinker) {
+		s.buffer = nil
 		s.finalBlocksOnly = true
+	}
+}
+
+// WithRetryBackoff configures the [Sinker] to which itself configurs the Substreams
+// gRPC stream to only send [pbsubstreamsrpc.BlockScopedData] once the block is final, this
+// means that `WithBlockDataBuffer` if used has is discarded and [BlockUndoSignalHandler]
+// will never be called.
+func WithRetryBackOff(backOff backoff.BackOff) Option {
+	return func(s *Sinker) {
+		s.backOff = backOff
 	}
 }
 

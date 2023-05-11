@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.2.4
+
+### Added
+
+* It's now possible to pass `sink.WithRetryBackOff(backOff)` instance instead of using the default configured back off (only from code).
+
+  > **Note** If `infinite-retry == false` is configured on the sinker, your back off will be wrapped with `backoff.WithMaxRetries(backOff, 15)`, this is not yet configurable.
+
 ## v0.2.3
 
 ### Changed

@@ -47,6 +47,7 @@ type Sinker struct {
 	tracer           logging.Tracer
 
 	// Options
+	backOff         backoff.BackOff
 	buffer          *blockDataBuffer
 	blockRange      *bstream.Range
 	infiniteRetry   bool
@@ -74,6 +75,7 @@ func New(
 		outputModule:     outputModule,
 		outputModuleHash: hex.EncodeToString(hash),
 		mode:             mode,
+		backOff:          backoff.NewExponentialBackOff(),
 		stats:            newStats(logger),
 		logger:           logger,
 		tracer:           tracer,
@@ -210,7 +212,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	s.OnTerminating(func(_ error) { closeFunc() })
 
 	// We will wait at max approximatively 5m before dying
-	var backOff backoff.BackOff = backoff.NewExponentialBackOff()
+	backOff := s.backOff
 	if !s.infiniteRetry {
 		backOff = backoff.WithMaxRetries(backOff, 15)
 	}
