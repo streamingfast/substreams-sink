@@ -164,7 +164,6 @@ func (s *Sinker) ApiToken() string {
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {
 	s.OnTerminating(func(_ error) {
-		s.stats.LogNow()
 		s.logger.Info("sinker terminating")
 		s.stats.Close()
 	})
@@ -213,7 +212,10 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 
 	// We will wait at max approximatively 5m before dying
 	backOff := s.backOff
+	s.logger.Debug("configured default backoff", zap.String("back_off", fmt.Sprintf("%#v", backOff)))
+
 	if !s.infiniteRetry {
+		s.logger.Debug("configured backoff to stop after 15 retries")
 		backOff = backoff.WithMaxRetries(backOff, 15)
 	}
 
