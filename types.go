@@ -41,10 +41,10 @@ type SinkerHandler interface {
 	// The [HandleBlockScopedData] must be non-nil, the [Sinker] enforces this.
 	//
 	// Your handler must return an error value that can be nil or non-nil. If non-nil, the error is assumed to be a fatal
-	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `sink.NewRetryableError(err)` to notify
+	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `derr.NewRetryableError(err)` to notify
 	// the [Sinker] that it should retry from last valid cursor. It's your responsibility to ensure no data was persisted prior the
 	// the error.
-	HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error
+	/**/ HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error
 
 	// HandleBlockUndoSignal defines the callback that will handle Substreams `BlockUndoSignal` messages.
 	//
@@ -57,7 +57,7 @@ type SinkerHandler interface {
 	// the [Sinker] enforces this.
 	//
 	// Your handler must return an error value that can be nil or non-nil. If non-nil, the error is assumed to be a fatal
-	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `sink.NewRetryableError(err)` to notify
+	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `derr.NewRetryableError(err)` to notify
 	// the [Sinker] that it should retry from last valid cursor. It's your responsibility to ensure no data was persisted prior the
 	// the error.
 	HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error

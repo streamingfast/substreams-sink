@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/derr"
 	"io"
 	"math"
 	"time"
@@ -263,9 +264,9 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			// Retryable or not, we increment the error counter in all those cases
 			SubstreamsErrorCount.Inc()
 
-			var retryableError *RetryableError
+			var retryableError *derr.RetryableError
 			if errors.As(err, &retryableError) {
-				s.logger.Error("substreams encountered a retryable error", zap.Error(retryableError.original))
+				s.logger.Error("substreams encountered a retryable error", zap.Error(retryableError.Unwrap()))
 
 				sleepFor := backOff.NextBackOff()
 				if sleepFor == backoff.Stop {
@@ -472,7 +473,7 @@ func (s *Sinker) doRequest(
 }
 
 func retryable(err error) error {
-	return NewRetryableError(err)
+	return derr.NewRetryableError(err)
 }
 
 var (
