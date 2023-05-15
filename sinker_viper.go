@@ -146,7 +146,7 @@ func NewFromViper(
 		resolvedOutputModuleName = pkg.SinkModule
 	}
 
-	zlog.Info("validating output module", zap.String("module_name", resolvedOutputModuleName))
+	zlog.Info("finding output module", zap.String("module_name", resolvedOutputModuleName))
 	module, err := graph.Module(resolvedOutputModuleName)
 	if err != nil {
 		return nil, fmt.Errorf("get output module %q: %w", resolvedOutputModuleName, err)

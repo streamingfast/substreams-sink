@@ -133,6 +133,14 @@ func (b *blockDataBuffer) Capacity() int {
 	return len(b.data)
 }
 
+func (b *blockDataBuffer) String() string {
+	if b == nil {
+		return "None"
+	}
+
+	return fmt.Sprintf("Buffering (%d blocks)", len(b.data))
+}
+
 func blockToRef(blockScopedData *pbsubstreamsrpc.BlockScopedData) bstream.BlockRef {
 	return clockToBlockRef(blockScopedData.Clock)
 }

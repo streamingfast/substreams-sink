@@ -98,7 +98,7 @@ func New(
 		zap.String("output_module_type", s.outputModule.Output.Type),
 		zap.String("output_module_hash", s.outputModuleHash),
 		zap.Stringer("client_config", (*substramsClientStringer)(s.clientConfig)),
-		zap.Bool("buffer", s.buffer != nil),
+		zap.Stringer("buffer", s.buffer),
 		zap.Stringer("block_range", s.blockRange),
 		zap.Bool("infinite_retry", s.infiniteRetry),
 		zap.Bool("final_blocks_only", s.finalBlocksOnly),
@@ -182,7 +182,7 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		fields = append(fields, zap.Stringer("restarting_at", cursor.Block()))
 	}
 	if blockRange := s.adjustStreamRange(); blockRange != nil && blockRange.EndBlock() != nil {
-		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", blockRange.EndBlock())))
+		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", (*blockRange.EndBlock())-1)))
 	}
 
 	s.logger.Info("starting sinker", fields...)
@@ -288,15 +288,15 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 //
 // When an undo buffer is used, we most finished +N block later than real
 // stop block to ensure we accumulate enough blocks to assert "finality".
-func (s *Sinker) adjustStreamRange() *bstream.Range {
-	if s.buffer == nil {
-		return s.blockRange
-	}
+func (s *Sinker) adjustStreamRange() (out *bstream.Range) {
+	if s.buffer != nil && s.blockRange != nil && s.blockRange.EndBlock() != nil {
+		defer func() {
+			s.logger.Debug("adjusted stream range", zap.Stringer("initial", s.blockRange), zap.Stringer("adjusted", out))
+		}()
 
-	if s.blockRange != nil && s.blockRange.EndBlock() != nil {
 		return bstream.NewRangeExcludingEnd(
 			s.blockRange.StartBlock(),
-			*(s.blockRange.EndBlock())+uint64(s.buffer.Capacity()),
+			(*s.blockRange.EndBlock())+uint64(s.buffer.Capacity()),
 		)
 	}
 
