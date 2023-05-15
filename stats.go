@@ -69,8 +69,15 @@ func (s *Stats) LogNow() {
 }
 
 func (s *Stats) Close() {
+	s.dataMsgRate.SyncNow()
+	s.progressMsgRate.SyncNow()
+	s.undoMsgRate.SyncNow()
 	s.LogNow()
+
 	s.Shutdown(nil)
+	s.dataMsgRate.Stop()
+	s.progressMsgRate.Stop()
+	s.undoMsgRate.Stop()
 }
 
 type unsetBlockRef struct{}
