@@ -9,7 +9,7 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20230407143220-06c919ae8476
 	github.com/streamingfast/cli v0.0.4-0.20230508203625-ecd532feb120
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
-	github.com/streamingfast/dmetrics v0.0.0-20230515151916-39e93cd589a5
+	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
 	github.com/streamingfast/logging v0.0.0-20221209193439-bff11742bf4c
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams v1.0.2-0.20230418195519-fa17a36fd728

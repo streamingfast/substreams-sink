@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* Fixed reported `data_msg` and `progress_msg` on exit to be the real final value from the counter.
+
 * Fixed the `end_at` block reported in a log statement.
 
 ### Changed
