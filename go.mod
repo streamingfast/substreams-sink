@@ -12,7 +12,7 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
 	github.com/streamingfast/logging v0.0.0-20221209193439-bff11742bf4c
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams v1.1.3-0.20230517191318-2fb7e20c380b
+	github.com/streamingfast/substreams v1.1.3-0.20230517210915-91fa4e7a11ef
 	go.uber.org/zap v1.21.0
 )
 

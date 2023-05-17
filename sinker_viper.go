@@ -131,7 +131,12 @@ func NewFromViper(
 	)
 
 	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPath))
-	pkg, err := manifest.NewReader(manifestPath).Read()
+	reader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("manifest reader: %w", err)
+	}
+
+	pkg, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("read manifest: %w", err)
 	}
