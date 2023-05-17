@@ -108,7 +108,12 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 // `outputModuleNameArg`, use `sink.InferOutputModuleFromPackage`.
 //
 // The `expectedOutputModuleType` should be the fully qualified expected Protobuf
-// package
+// package.
+//
+// The `manifestPath` can be left empty in which case we this method is going to look
+// in the current directory for a `substreams.yaml` file. If the `manifestPath` is
+// non-empty and points to a directory, we will look for a `substreams.yaml` file in that
+// directory.
 func NewFromViper(
 	cmd *cobra.Command,
 	expectedOutputModuleType string,
