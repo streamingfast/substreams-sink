@@ -171,7 +171,10 @@ func NewFromViper(
 	}
 
 	hashes := manifest.NewModuleHashes()
-	outputModuleHash := hashes.HashModule(pkg.Modules, module, graph)
+	outputModuleHash, err := hashes.HashModule(pkg.Modules, module, graph)
+	if err != nil {
+		return nil, fmt.Errorf("hash module %q: %w", module.Name, err)
+	}
 
 	apiToken := readAPIToken()
 	resolvedBlockRange, err := readBlockRange(module, blockRange)
