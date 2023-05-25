@@ -3,3 +3,4 @@
 .idea
 .release_notes.md
 dist/
+build/
