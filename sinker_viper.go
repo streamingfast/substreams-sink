@@ -14,7 +14,6 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -130,55 +129,9 @@ func NewFromViper(
 		zap.String("block_range", blockRange),
 	)
 
-	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPath))
-	reader, err := manifest.NewReader(manifestPath)
+	pkg, module, outputModuleHash, err := ReadManifestAndModule(manifestPath, outputModuleName, expectedOutputModuleType, zlog)
 	if err != nil {
-		return nil, fmt.Errorf("manifest reader: %w", err)
-	}
-
-	pkg, err := reader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("read manifest: %w", err)
-	}
-
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return nil, fmt.Errorf("create substreams module graph: %w", err)
-	}
-
-	resolvedOutputModuleName := outputModuleName
-	if resolvedOutputModuleName == InferOutputModuleFromPackage {
-		zlog.Debug("inferring module output name from package directly")
-		if pkg.SinkModule == "" {
-			return nil, fmt.Errorf("sink module is required in sink config")
-		}
-
-		resolvedOutputModuleName = pkg.SinkModule
-	}
-
-	zlog.Info("finding output module", zap.String("module_name", resolvedOutputModuleName))
-	module, err := graph.Module(resolvedOutputModuleName)
-	if err != nil {
-		return nil, fmt.Errorf("get output module %q: %w", resolvedOutputModuleName, err)
-	}
-	if module.GetKindMap() == nil {
-		return nil, fmt.Errorf("ouput module %q is *not* of  type 'Mapper'", resolvedOutputModuleName)
-	}
-
-	zlog.Info("validating output module type", zap.String("module_name", module.Name), zap.String("module_type", module.Output.Type))
-
-	if expectedOutputModuleType != IgnoreOutputModuleType {
-		unprefixedExpectedType, prefixedExpectedType := sanitizeModuleType(expectedOutputModuleType)
-		unprefixedActualType, prefixedActualType := sanitizeModuleType(module.Output.Type)
-		if prefixedActualType != prefixedExpectedType {
-			return nil, fmt.Errorf("sink only supports map module with output type %q but selected module %q output type is %q", unprefixedExpectedType, module.Name, unprefixedActualType)
-		}
-	}
-
-	hashes := manifest.NewModuleHashes()
-	outputModuleHash, err := hashes.HashModule(pkg.Modules, module, graph)
-	if err != nil {
-		return nil, fmt.Errorf("hash module %q: %w", module.Name, err)
+		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
 
 	apiToken := readAPIToken()
@@ -367,29 +320,6 @@ func readAPIToken() string {
 	}
 
 	return os.Getenv("SF_API_TOKEN")
-}
-
-// sanitizeModuleType give back both prefixed (so with `proto:`) and unprefixed
-// version of the input string:
-//
-// - `sanitizeModuleType("com.acme") == (com.acme, proto:com.acme)`
-// - `sanitizeModuleType("proto:com.acme") == (com.acme, proto:com.acme)`
-func sanitizeModuleType(in string) (unprefixed, prefixed string) {
-	if strings.HasPrefix(in, "proto:") {
-		return strings.TrimPrefix(in, "proto:"), in
-	}
-
-	return in, "proto:" + in
-}
-
-type expectedModuleType string
-
-func (e expectedModuleType) String() string {
-	if e == expectedModuleType(IgnoreOutputModuleType) {
-		return "<Ignored>"
-	}
-
-	return string(e)
 }
 
 func every[E any](s []E, test func(e E) bool) bool {
