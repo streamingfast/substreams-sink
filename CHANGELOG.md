@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v0.2.6
 
 ### Added
 
-* Added `sink.NewFromViper` and `sink.ReadManifestAndModule` accepts multiple expected output types now, facilitates simple package id renames.
+* Added support for multiple expected output types in `sink.NewFromViper` and `sink.ReadManifestAndModule`, facilitates simple package id renames.
 
 * Added `sink.ReadManifestAndModule` helper to easily get the full `sink` logic to load a manifest (expected output type, checks, etc.).
 
