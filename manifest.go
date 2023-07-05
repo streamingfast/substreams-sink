@@ -10,14 +10,26 @@ import (
 	"go.uber.org/zap"
 )
 
-func ReadManifestAndModule(manifestPath string, outputModuleName string, expectedOutputModuleType string, zlog *zap.Logger) (
+func ReadManifestAndModule(
+	manifestPath string,
+	outputModuleName string,
+	expectedOutputModuleType string,
+	skipPackageValidation bool,
+	zlog *zap.Logger,
+) (
 	pkg *pbsubstreams.Package,
 	module *pbsubstreams.Module,
 	outputModuleHash manifest.ModuleHash,
 	err error,
 ) {
 	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPath))
-	reader, err := manifest.NewReader(manifestPath)
+
+	var opts []manifest.Options
+	if skipPackageValidation {
+		opts = append(opts, manifest.SkipPackageValidationReader())
+	}
+
+	reader, err := manifest.NewReader(manifestPath, opts...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("manifest reader: %w", err)
 	}

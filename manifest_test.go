@@ -12,6 +12,7 @@ func TestReadManifestAndModule(t *testing.T) {
 		manifestPath             string
 		outputModuleName         string
 		expectedOutputModuleType string
+		skipPackageValudation    bool
 	}
 	tests := []struct {
 		name                 string
@@ -21,13 +22,13 @@ func TestReadManifestAndModule(t *testing.T) {
 		wantOutputModuleHash string
 		assertion            assert.ErrorAssertionFunc
 	}{
-		{"default", args{"testdata/substreams.yaml", "kv_out", "kv-out"}, true, "kv_out", "f0b74c6dc57fa840bf1e7ff526431f9f1b5240d0", assert.NoError},
-		{"multile expected type accepted", args{"testdata/substreams.yaml", "kv_out", "kv-out,graph-out"}, true, "kv_out", "f0b74c6dc57fa840bf1e7ff526431f9f1b5240d0", assert.NoError},
-		{"multile expected type accepted, inverted", args{"testdata/substreams.yaml", "graph_out", "kv-out,graph-out"}, true, "graph_out", "54acb6611a4a4b430c81e66639159efb49b618d5", assert.NoError},
+		{"default", args{"testdata/substreams.yaml", "kv_out", "kv-out", false}, true, "kv_out", "f0b74c6dc57fa840bf1e7ff526431f9f1b5240d0", assert.NoError},
+		{"multile expected type accepted", args{"testdata/substreams.yaml", "kv_out", "kv-out,graph-out", false}, true, "kv_out", "f0b74c6dc57fa840bf1e7ff526431f9f1b5240d0", assert.NoError},
+		{"multile expected type accepted, inverted", args{"testdata/substreams.yaml", "graph_out", "kv-out,graph-out", false}, true, "graph_out", "54acb6611a4a4b430c81e66639159efb49b618d5", assert.NoError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPkg, gotModule, gotOutputModuleHash, err := ReadManifestAndModule(tt.args.manifestPath, tt.args.outputModuleName, tt.args.expectedOutputModuleType, zlog)
+			gotPkg, gotModule, gotOutputModuleHash, err := ReadManifestAndModule(tt.args.manifestPath, tt.args.outputModuleName, tt.args.expectedOutputModuleType, tt.args.skipPackageValudation, zlog)
 			tt.assertion(t, err)
 
 			if tt.wantPackagePresent {

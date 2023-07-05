@@ -28,6 +28,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagFinalBlocksOnly,
 				FlagInfiniteRetry,
 				FlagIrreversibleOnly,
+				FlagSkipPackageValidation,
 			},
 		},
 		{
@@ -41,6 +42,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagFinalBlocksOnly,
 				FlagInfiniteRetry,
 				FlagIrreversibleOnly,
+				FlagSkipPackageValidation,
 			},
 		},
 		{
@@ -53,6 +55,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagFinalBlocksOnly,
 				FlagInfiniteRetry,
 				FlagIrreversibleOnly,
+				FlagSkipPackageValidation,
 			},
 		},
 		{
@@ -65,6 +68,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagFinalBlocksOnly,
 				FlagInfiniteRetry,
 				FlagIrreversibleOnly,
+				FlagSkipPackageValidation,
 			},
 		},
 		{
@@ -76,6 +80,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagFinalBlocksOnly,
 				FlagInfiniteRetry,
 				FlagIrreversibleOnly,
+				FlagSkipPackageValidation,
 			},
 		},
 		{
@@ -88,6 +93,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagLiveBlockTimeDelta,
 				FlagDevelopmentMode,
 				FlagInfiniteRetry,
+				FlagSkipPackageValidation,
 			},
 		},
 		{
@@ -101,6 +107,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagDevelopmentMode,
 				FlagFinalBlocksOnly,
 				FlagInfiniteRetry,
+				FlagSkipPackageValidation,
 			},
 		},
 	}

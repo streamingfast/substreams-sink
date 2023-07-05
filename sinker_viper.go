@@ -19,14 +19,15 @@ import (
 )
 
 const (
-	FlagInsecure           = "insecure"
-	FlagPlaintext          = "plaintext"
-	FlagUndoBufferSize     = "undo-buffer-size"
-	FlagLiveBlockTimeDelta = "live-block-time-delta"
-	FlagDevelopmentMode    = "development-mode"
-	FlagFinalBlocksOnly    = "final-blocks-only"
-	FlagInfiniteRetry      = "infinite-retry"
-	FlagIrreversibleOnly   = "irreversible-only"
+	FlagInsecure              = "insecure"
+	FlagPlaintext             = "plaintext"
+	FlagUndoBufferSize        = "undo-buffer-size"
+	FlagLiveBlockTimeDelta    = "live-block-time-delta"
+	FlagDevelopmentMode       = "development-mode"
+	FlagFinalBlocksOnly       = "final-blocks-only"
+	FlagInfiniteRetry         = "infinite-retry"
+	FlagIrreversibleOnly      = "irreversible-only"
+	FlagSkipPackageValidation = "skip-package-validation"
 )
 
 func FlagIgnore(in ...string) FlagIgnored {
@@ -56,6 +57,7 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 //	Flag `--development-mode` (defaults `false`)
 //	Flag `--final-blocks-only` (defaults `false`)
 //	Flag `--infinite-retry` (defaults `false`)
+//	Flag `--skip-package-validation` (defaults `false`)
 //
 // The `ignore` field can be used to multiple times to avoid adding the specified
 // `flags` to the the set. This can be used for example to avoid adding `--final-blocks-only`
@@ -98,6 +100,10 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	if flagIncluded(FlagInfiniteRetry) {
 		flags.Bool(FlagInfiniteRetry, false, "Default behavior is to retry 15 times spanning approximatively 5m before exiting with an error, activating this flag will retry forever")
 	}
+
+	if flagIncluded(FlagSkipPackageValidation) {
+		flags.Bool(FlagSkipPackageValidation, false, "Skip .spkg file validation, allowing the use of a partial spkg (without metadata and protobuf definiitons)")
+	}
 }
 
 // NewFromViper constructs a new Sinker instance from a fixed set of "known" flags.
@@ -121,15 +127,24 @@ func NewFromViper(
 	tracer logging.Tracer,
 	opts ...Option,
 ) (*Sinker, error) {
+	undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation := getViperFlags(cmd)
+
 	zlog.Info("sinker from CLI",
 		zap.String("endpoint", endpoint),
 		zap.String("manifest_path", manifestPath),
 		zap.String("output_module_name", outputModuleName),
 		zap.Stringer("expected_module_type", expectedModuleType(expectedOutputModuleType)),
 		zap.String("block_range", blockRange),
+		zap.Bool("development_mode", isDevelopmentMode),
+		zap.Bool("infinite_retry", infiniteRetry),
+		zap.Bool("final_blocks_only", finalBlocksOnly),
+		zap.Bool("skip_package_validation", skipPackageValidation),
+		zap.Duration("live_block_time_delta", liveBlockTimeDelta),
+		zap.Int("undo_buffer_size", undoBufferSize),
 	)
 
-	pkg, module, outputModuleHash, err := ReadManifestAndModule(manifestPath, outputModuleName, expectedOutputModuleType, zlog)
+	fmt.Println("reading module with", skipPackageValidation)
+	pkg, module, outputModuleHash, err := ReadManifestAndModule(manifestPath, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
@@ -142,7 +157,6 @@ func NewFromViper(
 
 	zlog.Debug("resolved block range", zap.Stringer("range", resolvedBlockRange))
 
-	undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly := getViperFlags(cmd)
 	if finalBlocksOnly {
 		zlog.Debug("override undo buffer size to 0 since final blocks only is requested")
 		undoBufferSize = 0
@@ -199,6 +213,7 @@ func getViperFlags(cmd *cobra.Command) (
 	isDevelopmentMode bool,
 	infiniteRetry bool,
 	finalBlocksOnly bool,
+	skipPackageValidation bool,
 ) {
 	if sflags.FlagDefined(cmd, FlagUndoBufferSize) {
 		undoBufferSize = sflags.MustGetInt(cmd, FlagUndoBufferSize)
@@ -227,6 +242,9 @@ func getViperFlags(cmd *cobra.Command) (
 		}
 	}
 
+	if sflags.FlagDefined(cmd, FlagSkipPackageValidation) {
+		skipPackageValidation = sflags.MustGetBool(cmd, FlagSkipPackageValidation)
+	}
 	return
 }
 
