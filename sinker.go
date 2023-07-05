@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/derr"
 	"io"
-	"math"
 	"time"
+
+	"github.com/streamingfast/derr"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/streamingfast/bstream"
@@ -227,7 +227,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		startBlock = adjustedRange.StartBlock()
 	}
 
-	var stopBlock uint64 = math.MaxUint64
+	var stopBlock uint64 = 0
 	if adjustedRange != nil && adjustedRange.EndBlock() != nil {
 		stopBlock = *adjustedRange.EndBlock()
 	}
