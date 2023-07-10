@@ -108,6 +108,11 @@ func ReadManifestAndModuleAndBlockRange(
 	err error,
 ) {
 	pkg, module, outputModuleHash, err = ReadManifestAndModule(manifestPath, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
+	if err != nil {
+		err = fmt.Errorf("read manifest and module: %w", err)
+		return
+	}
+
 	resolvedBlockRange, err = ReadBlockRange(module, blockRange)
 	if err != nil {
 		err = fmt.Errorf("resolve block range: %w", err)
