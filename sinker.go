@@ -8,10 +8,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/streamingfast/derr"
-
 	"github.com/cenkalti/backoff/v4"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
@@ -152,7 +151,13 @@ func (s *Sinker) OutputModuleTypeUnprefixed() (unprefixed string) {
 	return
 }
 
-// EndpointConfig returns the endpoint configuration used by this sinker instance.
+// ClientConfig returns the the `SubstreamsClientConfig`used by this sinker instance.
+func (s *Sinker) ClientConfig() *client.SubstreamsClientConfig {
+	return s.clientConfig
+}
+
+// EndpointConfig returns the endpoint configuration used by this sinker instance, this is an extraction
+// of the `SubstreamsClientConfig` used by this sinker instance.
 func (s *Sinker) EndpointConfig() (endpoint string, plaintext bool, insecure bool) {
 	return s.clientConfig.Endpoint(), s.clientConfig.PlainText(), s.clientConfig.Insecure()
 }

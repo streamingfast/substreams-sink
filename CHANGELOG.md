@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* Added `ClientConfig` on `sink.Sinker` instance to retrieve Substreams client configuration easily.
+
 * Added `ReadManifestAndModuleAndBlockRange` as a convenience for `ReadManifestAndModule` and `ReadBlockRange`.
 
 * Added `ReadBlockRange` so that it's possible to easily read a block range argument against a Substreams parsed module.
