@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Next
 
+### Added
+
+* Added `ReadManifestAndModuleAndBlockRange` as a convenience for `ReadManifestAndModule` and `ReadBlockRange`.
+
+* Added `ReadBlockRange` so that it's possible to easily read a block range argument against a Substreams parsed module.
+
 ### Fixed
 
 * The `stop_block` for infinite streaming passed to the server is now 0, it seems `MaxUint64` was causing some issues on the server, should result normally in better startup performance now.

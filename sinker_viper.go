@@ -143,18 +143,19 @@ func NewFromViper(
 		zap.Int("undo_buffer_size", undoBufferSize),
 	)
 
-	fmt.Println("reading module with", skipPackageValidation)
-	pkg, module, outputModuleHash, err := ReadManifestAndModule(manifestPath, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
+	pkg, module, outputModuleHash, resolvedBlockRange, err := ReadManifestAndModuleAndBlockRange(
+		manifestPath,
+		outputModuleName,
+		expectedOutputModuleType,
+		skipPackageValidation,
+		blockRange,
+		zlog,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
 
 	apiToken := readAPIToken()
-	resolvedBlockRange, err := readBlockRange(module, blockRange)
-	if err != nil {
-		return nil, fmt.Errorf("resolve block range: %w", err)
-	}
-
 	zlog.Debug("resolved block range", zap.Stringer("range", resolvedBlockRange))
 
 	if finalBlocksOnly {
@@ -264,7 +265,19 @@ func parseNumber(number string) (numberInt64 int64, numberIsEmpty bool, numberIs
 	return
 }
 
-func readBlockRange(module *pbsubstreams.Module, input string) (*bstream.Range, error) {
+// ReadBlockRange parses a block range string and returns a bstream.Range out of it
+// using the model to resolve relative block numbers to absolute block numbers.
+//
+// The block range string is of the form:
+//
+//	[<before>]:[<after>]
+//
+// Where before and after are block numbers. If before is empty, it is resolve to the module's start block.
+// If after is empty it means stream forever. If after is empty and before is empty, the
+// range is the entire chain.
+//
+// If before or after is prefixed with a +, it is relative to the module's start block.
+func ReadBlockRange(module *pbsubstreams.Module, input string) (*bstream.Range, error) {
 	if input == "" {
 		input = ":"
 	}

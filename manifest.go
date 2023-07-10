@@ -5,11 +5,20 @@ import (
 	"strings"
 
 	"github.com/bobg/go-generics/v2/slices"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
+// ReadManifestAndModule reads the manifest and returns the package, the output module and its hash.
+//
+// If outputModuleName is set to InferOutputModuleFromPackage, the sink will try to infer the output module from the
+// package's sink_module field, if present.
+//
+// If expectedOutputModuleType is set to IgnoreOutputModuleType, the sink will not validate the output module type.
+//
+// If skipPackageValidation is set to true, the sink will not validate the package, you will have to do it yourself.
 func ReadManifestAndModule(
 	manifestPath string,
 	outputModuleName string,
@@ -81,6 +90,31 @@ func ReadManifestAndModule(
 	}
 
 	return pkg, module, outputModuleHash, nil
+}
+
+// ReadManifestAndModuleAndBlockRange acts exactly like ReadManifestAndModule but also reads the block range.
+func ReadManifestAndModuleAndBlockRange(
+	manifestPath string,
+	outputModuleName string,
+	expectedOutputModuleType string,
+	skipPackageValidation bool,
+	blockRange string,
+	zlog *zap.Logger,
+) (
+	pkg *pbsubstreams.Package,
+	module *pbsubstreams.Module,
+	outputModuleHash manifest.ModuleHash,
+	resolvedBlockRange *bstream.Range,
+	err error,
+) {
+	pkg, module, outputModuleHash, err = ReadManifestAndModule(manifestPath, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
+	resolvedBlockRange, err = ReadBlockRange(module, blockRange)
+	if err != nil {
+		err = fmt.Errorf("resolve block range: %w", err)
+		return
+	}
+
+	return
 }
 
 // sanitizeModuleTypes has the same behavior as sanitizeModuleType but explodes

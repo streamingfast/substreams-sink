@@ -179,7 +179,7 @@ func Test_readBlockRange(t *testing.T) {
 				InitialBlock: tt.args.moduleStartBlock,
 			}
 
-			got, err := readBlockRange(module, tt.args.blockRangeArg)
+			got, err := ReadBlockRange(module, tt.args.blockRangeArg)
 
 			if tt.assertion == nil {
 				tt.assertion = require.NoError
