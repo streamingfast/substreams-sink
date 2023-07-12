@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* Added logging of new `Session` received values (`linear_handoff_block`, `max_parallel_workers` and `resolved_start_block`).
+
+* Added `--header, -H` (can be repeated multiple times) flag to pass extra headers to the server.
+
 * Added `ClientConfig` on `sink.Sinker` instance to retrieve Substreams client configuration easily.
 
 * Added `ReadManifestAndModuleAndBlockRange` as a convenience for `ReadManifestAndModule` and `ReadBlockRange`.

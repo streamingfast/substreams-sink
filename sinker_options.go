@@ -74,3 +74,11 @@ func WithBlockRange(blockRange *bstream.Range) Option {
 		s.blockRange = blockRange
 	}
 }
+
+// WithExtraHeaders configures the [Sinker] instance to send extra headers to the Substreams
+// backend server.
+func WithExtraHeaders(headers []string) Option {
+	return func(s *Sinker) {
+		s.extraHeaders = headers
+	}
+}

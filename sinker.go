@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -21,6 +23,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -53,6 +56,7 @@ type Sinker struct {
 	infiniteRetry   bool
 	finalBlocksOnly bool
 	livenessChecker LivenessChecker
+	extraHeaders    []string
 
 	// State
 	stats *Stats
@@ -216,6 +220,16 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	}
 	s.OnTerminating(func(_ error) { closeFunc() })
 
+	var headersArray []string
+	if len(s.extraHeaders) > 0 {
+		headers := parseHeaders(s.extraHeaders)
+		headersArray = make([]string, 0, len(headers)*2)
+
+		for k, v := range parseHeaders(s.extraHeaders) {
+			headersArray = append(headersArray, k, v)
+		}
+	}
+
 	// We will wait at max approximatively 5m before dying
 	backOff := s.backOff
 	s.logger.Debug("configured default backoff", zap.String("back_off", fmt.Sprintf("%#v", backOff)))
@@ -248,8 +262,14 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			ProductionMode:  s.mode == SubstreamsModeProduction,
 		}
 
+		// Add extra headers if set
+		streamCtx := ctx
+		if len(headersArray) > 0 {
+			streamCtx = metadata.AppendToOutgoingContext(streamCtx, headersArray...)
+		}
+
 		var receivedMessage bool
-		activeCursor, receivedMessage, err = s.doRequest(ctx, activeCursor, req, ssClient, callOpts, handler)
+		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, req, ssClient, callOpts, handler)
 
 		// If we received at least one message, we must reset the backoff
 		if receivedMessage {
@@ -468,7 +488,12 @@ func (s *Sinker) doRequest(
 			s.logger.Warn("received debug snapshot message, there is no reason to receive those here", zap.Reflect("message", r))
 
 		case *pbsubstreamsrpc.Response_Session:
-			s.logger.Info("session initialized with remote endpoint", zap.String("trace_id", r.Session.TraceId))
+			s.logger.Info("session initialized with remote endpoint",
+				zap.Uint64("max_parallel_workers", r.Session.MaxParallelWorkers),
+				zap.Uint64("linear_handoff_block", r.Session.LinearHandoffBlock),
+				zap.Uint64("resolved_start_block", r.Session.ResolvedStartBlock),
+				zap.String("trace_id", r.Session.TraceId),
+			)
 
 		default:
 			s.logger.Info("received unknown type of message", zap.Reflect("message", r))
@@ -485,3 +510,19 @@ var (
 	liveBlock    bool = true
 	blockNotLive bool = false
 )
+
+func parseHeaders(headers []string) map[string]string {
+	if headers == nil {
+		return nil
+	}
+
+	result := make(map[string]string)
+	for _, header := range headers {
+		parts := strings.Split(header, ":")
+		if len(parts) != 2 {
+			log.Fatalf("invalid header format: %s", header)
+		}
+		result[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+	}
+	return result
+}

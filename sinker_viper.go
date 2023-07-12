@@ -28,6 +28,7 @@ const (
 	FlagInfiniteRetry         = "infinite-retry"
 	FlagIrreversibleOnly      = "irreversible-only"
 	FlagSkipPackageValidation = "skip-package-validation"
+	FlagExtraHeaders          = "header"
 )
 
 func FlagIgnore(in ...string) FlagIgnored {
@@ -58,6 +59,7 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 //	Flag `--final-blocks-only` (defaults `false`)
 //	Flag `--infinite-retry` (defaults `false`)
 //	Flag `--skip-package-validation` (defaults `false`)
+//	Flag `--header (-H)` (defaults `[]`)
 //
 // The `ignore` field can be used to multiple times to avoid adding the specified
 // `flags` to the the set. This can be used for example to avoid adding `--final-blocks-only`
@@ -104,6 +106,10 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	if flagIncluded(FlagSkipPackageValidation) {
 		flags.Bool(FlagSkipPackageValidation, false, "Skip .spkg file validation, allowing the use of a partial spkg (without metadata and protobuf definiitons)")
 	}
+
+	if flagIncluded(FlagExtraHeaders) {
+		flags.StringArrayP(FlagExtraHeaders, "H", nil, "Additional headers to be sent in the substreams request")
+	}
 }
 
 // NewFromViper constructs a new Sinker instance from a fixed set of "known" flags.
@@ -127,7 +133,7 @@ func NewFromViper(
 	tracer logging.Tracer,
 	opts ...Option,
 ) (*Sinker, error) {
-	undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation := getViperFlags(cmd)
+	undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, extraHeaders := getViperFlags(cmd)
 
 	zlog.Info("sinker from CLI",
 		zap.String("endpoint", endpoint),
@@ -141,6 +147,7 @@ func NewFromViper(
 		zap.Bool("skip_package_validation", skipPackageValidation),
 		zap.Duration("live_block_time_delta", liveBlockTimeDelta),
 		zap.Int("undo_buffer_size", undoBufferSize),
+		zap.Strings("extra_headers", extraHeaders),
 	)
 
 	pkg, module, outputModuleHash, resolvedBlockRange, err := ReadManifestAndModuleAndBlockRange(
@@ -196,6 +203,10 @@ func NewFromViper(
 		defaultSinkOptions = append(defaultSinkOptions, WithBlockRange(resolvedBlockRange))
 	}
 
+	if len(extraHeaders) > 0 {
+		defaultSinkOptions = append(defaultSinkOptions, WithExtraHeaders(extraHeaders))
+	}
+
 	return New(
 		mode,
 		pkg,
@@ -215,6 +226,7 @@ func getViperFlags(cmd *cobra.Command) (
 	infiniteRetry bool,
 	finalBlocksOnly bool,
 	skipPackageValidation bool,
+	extraHeaders []string,
 ) {
 	if sflags.FlagDefined(cmd, FlagUndoBufferSize) {
 		undoBufferSize = sflags.MustGetInt(cmd, FlagUndoBufferSize)
@@ -246,6 +258,11 @@ func getViperFlags(cmd *cobra.Command) (
 	if sflags.FlagDefined(cmd, FlagSkipPackageValidation) {
 		skipPackageValidation = sflags.MustGetBool(cmd, FlagSkipPackageValidation)
 	}
+
+	if sflags.FlagDefined(cmd, FlagExtraHeaders) {
+		extraHeaders = sflags.MustGetStringArray(cmd, FlagExtraHeaders)
+	}
+
 	return
 }
 
