@@ -21,6 +21,7 @@ import (
 // If skipPackageValidation is set to true, the sink will not validate the package, you will have to do it yourself.
 func ReadManifestAndModule(
 	manifestPath string,
+	params []string,
 	outputModuleName string,
 	expectedOutputModuleType string,
 	skipPackageValidation bool,
@@ -46,6 +47,10 @@ func ReadManifestAndModule(
 	pkg, err = reader.Read()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("read manifest: %w", err)
+	}
+
+	if err := manifest.ApplyParams(params, pkg); err != nil {
+		return nil, nil, nil, fmt.Errorf("apply params: %w", err)
 	}
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
@@ -95,6 +100,7 @@ func ReadManifestAndModule(
 // ReadManifestAndModuleAndBlockRange acts exactly like ReadManifestAndModule but also reads the block range.
 func ReadManifestAndModuleAndBlockRange(
 	manifestPath string,
+	params []string,
 	outputModuleName string,
 	expectedOutputModuleType string,
 	skipPackageValidation bool,
@@ -107,7 +113,7 @@ func ReadManifestAndModuleAndBlockRange(
 	resolvedBlockRange *bstream.Range,
 	err error,
 ) {
-	pkg, module, outputModuleHash, err = ReadManifestAndModule(manifestPath, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
+	pkg, module, outputModuleHash, err = ReadManifestAndModule(manifestPath, params, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
 	if err != nil {
 		err = fmt.Errorf("read manifest and module: %w", err)
 		return

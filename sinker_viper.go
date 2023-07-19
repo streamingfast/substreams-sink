@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	FlagParams                = "params"
 	FlagInsecure              = "insecure"
 	FlagPlaintext             = "plaintext"
 	FlagUndoBufferSize        = "undo-buffer-size"
@@ -51,8 +52,9 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 //
 // Defines
 //
+//	Flag `--params` (-p) (defaults `[]`)
 //	Flag `--insecure` (-k) (defaults `false`)
-//	Flag `--plaintext` (-p) (defaults `false`)
+//	Flag `--plaintext` (defaults `false`)
 //	Flag `--undo-buffer-size` (defaults `12`)
 //	Flag `--live-block-time-delta` (defaults `300*time.Second`)
 //	Flag `--development-mode` (defaults `false`)
@@ -69,12 +71,16 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	flagIncluded := func(x string) bool { return every(ignore, func(e FlagIgnored) bool { return !e.IsIgnored(x) }) }
 
+	if flagIncluded(FlagParams) {
+		flags.StringArrayP(FlagParams, "p", nil, "Set a params for parameterizable modules of the from `-p <module>=<value>`, can be specified multiple times (e.g. -p module1=valA -p module2=valX&valY)")
+	}
+
 	if flagIncluded(FlagInsecure) {
-		flags.BoolP(FlagInsecure, "k", false, "Skip certificate validation on GRPC connection")
+		flags.BoolP(FlagInsecure, "k", false, "Skip certificate validation on gRPC connection")
 	}
 
 	if flagIncluded(FlagPlaintext) {
-		flags.BoolP(FlagPlaintext, "p", false, "Establish GRPC connection in plaintext")
+		flags.Bool(FlagPlaintext, false, "Establish gRPC connection in plaintext")
 	}
 
 	if flagIncluded(FlagUndoBufferSize) {
@@ -133,11 +139,12 @@ func NewFromViper(
 	tracer logging.Tracer,
 	opts ...Option,
 ) (*Sinker, error) {
-	undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, extraHeaders := getViperFlags(cmd)
+	params, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, extraHeaders := getViperFlags(cmd)
 
 	zlog.Info("sinker from CLI",
 		zap.String("endpoint", endpoint),
 		zap.String("manifest_path", manifestPath),
+		zap.Strings("params", params),
 		zap.String("output_module_name", outputModuleName),
 		zap.Stringer("expected_module_type", expectedModuleType(expectedOutputModuleType)),
 		zap.String("block_range", blockRange),
@@ -152,6 +159,7 @@ func NewFromViper(
 
 	pkg, module, outputModuleHash, resolvedBlockRange, err := ReadManifestAndModuleAndBlockRange(
 		manifestPath,
+		params,
 		outputModuleName,
 		expectedOutputModuleType,
 		skipPackageValidation,
@@ -220,6 +228,7 @@ func NewFromViper(
 }
 
 func getViperFlags(cmd *cobra.Command) (
+	params []string,
 	undoBufferSize int,
 	liveBlockTimeDelta time.Duration,
 	isDevelopmentMode bool,
@@ -228,6 +237,10 @@ func getViperFlags(cmd *cobra.Command) (
 	skipPackageValidation bool,
 	extraHeaders []string,
 ) {
+	if sflags.FlagDefined(cmd, FlagParams) {
+		params = sflags.MustGetStringArray(cmd, FlagParams)
+	}
+
 	if sflags.FlagDefined(cmd, FlagUndoBufferSize) {
 		undoBufferSize = sflags.MustGetInt(cmd, FlagUndoBufferSize)
 	}

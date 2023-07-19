@@ -9,6 +9,14 @@ binaries:
     file: binaries/dummy.wasm
 
 modules:
+  - name: params_out
+    kind: map
+    initialBlock: 0
+    inputs:
+      - params: string
+    output:
+      type: proto:string
+
   - name: kv_out
     kind: map
     initialBlock: 0

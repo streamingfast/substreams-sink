@@ -20,6 +20,7 @@ func TestAddFlagsToSet(t *testing.T) {
 			"default",
 			nil,
 			[]string{
+				FlagParams,
 				FlagInsecure,
 				FlagPlaintext,
 				FlagUndoBufferSize,
@@ -36,6 +37,7 @@ func TestAddFlagsToSet(t *testing.T) {
 			"ignore one",
 			[]FlagIgnored{FlagIgnore(FlagInsecure)},
 			[]string{
+				FlagParams,
 				FlagPlaintext,
 				FlagUndoBufferSize,
 				FlagLiveBlockTimeDelta,
@@ -51,6 +53,7 @@ func TestAddFlagsToSet(t *testing.T) {
 			"ignore one multiple",
 			[]FlagIgnored{FlagIgnore(FlagInsecure, FlagPlaintext)},
 			[]string{
+				FlagParams,
 				FlagUndoBufferSize,
 				FlagLiveBlockTimeDelta,
 				FlagDevelopmentMode,
@@ -65,6 +68,7 @@ func TestAddFlagsToSet(t *testing.T) {
 			"ignore multiple",
 			[]FlagIgnored{FlagIgnore(FlagInsecure), FlagIgnore(FlagPlaintext)},
 			[]string{
+				FlagParams,
 				FlagUndoBufferSize,
 				FlagLiveBlockTimeDelta,
 				FlagDevelopmentMode,
@@ -79,6 +83,7 @@ func TestAddFlagsToSet(t *testing.T) {
 			"ignore mixed",
 			[]FlagIgnored{FlagIgnore(FlagInsecure), FlagIgnore(FlagPlaintext, FlagLiveBlockTimeDelta)},
 			[]string{
+				FlagParams,
 				FlagUndoBufferSize,
 				FlagDevelopmentMode,
 				FlagFinalBlocksOnly,
@@ -92,6 +97,7 @@ func TestAddFlagsToSet(t *testing.T) {
 			"ignore final block",
 			[]FlagIgnored{FlagIgnore(FlagFinalBlocksOnly)},
 			[]string{
+				FlagParams,
 				FlagInsecure,
 				FlagPlaintext,
 				FlagUndoBufferSize,
@@ -106,6 +112,7 @@ func TestAddFlagsToSet(t *testing.T) {
 			"ignore irreversible only",
 			[]FlagIgnored{FlagIgnore(FlagIrreversibleOnly)},
 			[]string{
+				FlagParams,
 				FlagInsecure,
 				FlagPlaintext,
 				FlagUndoBufferSize,

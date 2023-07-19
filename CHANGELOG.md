@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Next
 
+### Changed
+
+#### CLI
+
+* **Breaking** Flag shorthand `-p` for `--plaintext` has been re-assigned to Substreams params definition, to align with `substreams run/gui` on that aspect. There is no shorthand anymore for `--plaintext`.
+
+  If you were using before `-p`, please convert to `--plaintext`.
+
+  > **Note** We expect that this is affecting very few users as `--plaintext` is usually used only on developers machine.
+
+#### Library
+
+* **Breaking** `ReadManifestAndModule` signature changed to add `params []string`, this is required for proper computation of module's output hash, upgrade by passing `nil` for this parameter.
+
+* **Breaking** `ReadManifestAndModuleAndBlockRange` signature changed to add `params []string`, this is required for proper computation of module's output hash, upgrade by passing `nil` for this parameter.
+
 ### Added
+
+* Added support for `--params, -p` (can be repeated multiple times) on the form `-p <module>=<value>`.
 
 * Added logging of new `Session` received values (`linear_handoff_block`, `max_parallel_workers` and `resolved_start_block`).
 
