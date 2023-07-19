@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Library
 
+* gRPC `InvalidArgument` error(s) are not retried anymore like specifying and invalid start block or argument in your request.
+
 * **Breaking** `ReadManifestAndModule` signature changed to add `params []string`, this is required for proper computation of module's output hash, upgrade by passing `nil` for this parameter.
 
 * **Breaking** `ReadManifestAndModuleAndBlockRange` signature changed to add `params []string`, this is required for proper computation of module's output hash, upgrade by passing `nil` for this parameter.

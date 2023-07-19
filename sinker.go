@@ -364,6 +364,10 @@ func (s *Sinker) doRequest(
 				switch dgrpcError.Code() {
 				case codes.Unauthenticated, codes.Canceled:
 					return activeCursor, receivedMessage, fmt.Errorf("stream failure: %w", err)
+
+				case codes.InvalidArgument:
+					return activeCursor, receivedMessage, fmt.Errorf("stream invalid: %w", err)
+
 				}
 			}
 
