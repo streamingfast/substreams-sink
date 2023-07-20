@@ -359,7 +359,6 @@ func (s *Sinker) doRequest(
 				return activeCursor, receivedMessage, err
 			}
 
-			// Unauthanticated and canceled are not retryable
 			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
 				switch dgrpcError.Code() {
 				case codes.Unauthenticated, codes.Canceled:
