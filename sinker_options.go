@@ -82,3 +82,19 @@ func WithExtraHeaders(headers []string) Option {
 		s.extraHeaders = headers
 	}
 }
+
+// WithAverageBlockTimeProcessing configures the [Sinker] instance to track the average time it
+// takes to process a block.
+func WithAverageBlockTimeProcessing(name string, entryCount int) Option {
+	return func(s *Sinker) {
+		s.averageBlockTimeProcessing = NewAverageInt64WithCount(name, entryCount)
+	}
+}
+
+// WithAverageBlockSec configures the [Sinker] instance to track the average number of blocks
+// processed per second.
+func WithAverageBlockSec(name string, entryCount int) Option {
+	return func(s *Sinker) {
+		s.averageBlockSec = NewAverageInt64WithCount(name, entryCount)
+	}
+}

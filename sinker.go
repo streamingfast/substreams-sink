@@ -50,13 +50,15 @@ type Sinker struct {
 	tracer           logging.Tracer
 
 	// Options
-	backOff         backoff.BackOff
-	buffer          *blockDataBuffer
-	blockRange      *bstream.Range
-	infiniteRetry   bool
-	finalBlocksOnly bool
-	livenessChecker LivenessChecker
-	extraHeaders    []string
+	backOff                    backoff.BackOff
+	buffer                     *blockDataBuffer
+	blockRange                 *bstream.Range
+	infiniteRetry              bool
+	finalBlocksOnly            bool
+	livenessChecker            LivenessChecker
+	extraHeaders               []string
+	averageBlockTimeProcessing *AverageInt64
+	averageBlockSec            *AverageInt64
 
 	// State
 	stats *Stats
@@ -121,6 +123,14 @@ func (s *substramsClientStringer) String() string {
 
 func (s *Sinker) BlockRange() *bstream.Range {
 	return s.blockRange
+}
+
+func (s *Sinker) AverageBlockTimeProcessing() *AverageInt64 {
+	return s.averageBlockTimeProcessing
+}
+
+func (s *Sinker) AverageBlockSec() *AverageInt64 {
+	return s.averageBlockSec
 }
 
 func (s *Sinker) Package() *pbsubstreams.Package {
@@ -200,7 +210,7 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		s.logger.Info("substreams ended correctly, reached your stop block", zap.Stringer("last_block_seen", lastCursor.Block()))
 	}
 
-	// If the context is canceled and we are here, it we have stop running without any other error, so Shutdown without error,
+	// If the context is canceled, and we are here, if we have stop running without any other error, so Shutdown without error,
 	// we are not the cause of the error. We still shutdown so Sinker last stats is still printed.
 	shutdownErr := err
 	if ctx.Err() == context.Canceled {
