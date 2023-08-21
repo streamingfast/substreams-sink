@@ -305,7 +305,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 
 				sleepFor := backOff.NextBackOff()
 				if sleepFor == backoff.Stop {
-					return activeCursor, fmt.Errorf("substreams encountered a retryable error, but backoff is exhausted: %w", retryableError.Unwrap())
+					return activeCursor, retryableError
 				}
 
 				s.logger.Info("sleeping before re-connecting", zap.Duration("sleep", sleepFor))
