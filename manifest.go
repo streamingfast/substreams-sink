@@ -41,12 +41,12 @@ func ReadManifestAndModule(
 
 	reader, err := manifest.NewReader(manifestPath, opts...)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("manifest reader: %w", err)
+		return nil, nil, nil, fmt.Errorf("manifest reader %q: %w", manifestPath, err)
 	}
 
 	pkg, err = reader.Read()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("read manifest: %w", err)
+		return nil, nil, nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
 	if err := manifest.ApplyParams(params, pkg); err != nil {

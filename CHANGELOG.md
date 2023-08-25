@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* Added manifest path in error message when failing to read it.
+
 * When back off limit expires, the returned error now also contains the last retryable error unwrapped received.
 
 ## v0.3.0
