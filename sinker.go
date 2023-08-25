@@ -295,7 +295,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 
 				sleepFor := backOff.NextBackOff()
 				if sleepFor == backoff.Stop {
-					return activeCursor, retryableError
+					return activeCursor, fmt.Errorf("%w: %w", ErrBackOffExpired, retryableError.Unwrap())
 				}
 
 				s.logger.Info("sleeping before re-connecting", zap.Duration("sleep", sleepFor))
