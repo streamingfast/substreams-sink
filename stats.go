@@ -12,9 +12,8 @@ import (
 type Stats struct {
 	*shutter.Shutter
 
-	progressMsgRate *dmetrics.AvgRatePromCounter
-	dataMsgRate     *dmetrics.AvgRatePromCounter
-	undoMsgRate     *dmetrics.AvgRatePromCounter
+	dataMsgRate *dmetrics.AvgRatePromCounter
+	undoMsgRate *dmetrics.AvgRatePromCounter
 
 	lastBlock bstream.BlockRef
 	logger    *zap.Logger
@@ -24,10 +23,9 @@ func newStats(logger *zap.Logger) *Stats {
 	return &Stats{
 		Shutter: shutter.New(),
 
-		progressMsgRate: dmetrics.MustNewAvgRateFromPromCounter(ProgressMessageCount, 1*time.Second, 30*time.Second, "msg"),
-		dataMsgRate:     dmetrics.MustNewAvgRateFromPromCounter(DataMessageCount, 1*time.Second, 30*time.Second, "msg"),
-		undoMsgRate:     dmetrics.MustNewAvgRateFromPromCounter(UndoMessageCount, 1*time.Second, 30*time.Second, "msg"),
-		lastBlock:       unsetBlockRef{},
+		dataMsgRate: dmetrics.MustNewAvgRateFromPromCounter(DataMessageCount, 1*time.Second, 30*time.Second, "msg"),
+		undoMsgRate: dmetrics.MustNewAvgRateFromPromCounter(UndoMessageCount, 1*time.Second, 30*time.Second, "msg"),
+		lastBlock:   unsetBlockRef{},
 
 		logger: logger,
 	}
@@ -58,11 +56,16 @@ func (s *Stats) Start(each time.Duration) {
 }
 
 func (s *Stats) LogNow() {
+
 	// Logging fields order is important as it affects the final rendering, we carefully ordered
 	// them so the development logs looks nicer.
 	s.logger.Info("substreams stream stats",
 		zap.Stringer("data_msg_rate", s.dataMsgRate),
-		zap.Stringer("progress_msg_rate", s.progressMsgRate),
+		zap.Any("progress_last_block", dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")),
+		zap.Any("progress_running_jobs", dmetrics.NewValuesFromMetric(ProgressMessageRunningJobs).Uints("stage")),
+		zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProgressMessageTotalProcessedBlocks, "blocks").ValueUint()),
+		zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
+
 		zap.Stringer("undo_msg_rate", s.undoMsgRate),
 		zap.Stringer("last_block", s.lastBlock),
 	)
@@ -70,13 +73,11 @@ func (s *Stats) LogNow() {
 
 func (s *Stats) Close() {
 	s.dataMsgRate.SyncNow()
-	s.progressMsgRate.SyncNow()
 	s.undoMsgRate.SyncNow()
 	s.LogNow()
 
 	s.Shutdown(nil)
 	s.dataMsgRate.Stop()
-	s.progressMsgRate.Stop()
 	s.undoMsgRate.Stop()
 }
 

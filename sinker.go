@@ -59,7 +59,8 @@ type Sinker struct {
 	extraHeaders    []string
 
 	// State
-	stats *Stats
+	stats                   *Stats
+	requestActiveStartBlock uint64
 }
 
 func New(
@@ -190,8 +191,8 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	if cursor != nil {
 		fields = append(fields, zap.Stringer("restarting_at", cursor.Block()))
 	}
-	if blockRange := s.adjustStreamRange(); blockRange != nil && blockRange.EndBlock() != nil {
-		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", (*blockRange.EndBlock())-1)))
+	if s.adjustedEndBlock() != 0 {
+		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", s.adjustedEndBlock()-1)))
 	}
 
 	s.logger.Info("starting sinker", fields...)
@@ -212,7 +213,6 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 
 func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler) (activeCursor *Cursor, err error) {
 	activeCursor = cursor
-	adjustedRange := s.adjustStreamRange()
 
 	ssClient, closeFunc, callOpts, err := client.NewSubstreamsClient(s.clientConfig)
 	if err != nil {
@@ -241,15 +241,8 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 
 	backOff = backoff.WithContext(backOff, ctx)
 
-	startBlock := uint64(0)
-	if adjustedRange != nil {
-		startBlock = adjustedRange.StartBlock()
-	}
-
-	var stopBlock uint64 = 0
-	if adjustedRange != nil && adjustedRange.EndBlock() != nil {
-		stopBlock = *adjustedRange.EndBlock()
-	}
+	startBlock := s.BlockRange().StartBlock()
+	stopBlock := s.adjustedEndBlock()
 
 	for {
 		req := &pbsubstreamsrpc.Request{
@@ -308,24 +301,20 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	}
 }
 
-// adjusedStreamRange adjust the sinker range if defined and bounded
-// when there is an undo buffer in use.
-//
 // When an undo buffer is used, we most finished +N block later than real
 // stop block to ensure we accumulate enough blocks to assert "finality".
-func (s *Sinker) adjustStreamRange() (out *bstream.Range) {
-	if s.buffer != nil && s.blockRange != nil && s.blockRange.EndBlock() != nil {
-		defer func() {
-			s.logger.Debug("adjusted stream range", zap.Stringer("initial", s.blockRange), zap.Stringer("adjusted", out))
-		}()
-
-		return bstream.NewRangeExcludingEnd(
-			s.blockRange.StartBlock(),
-			(*s.blockRange.EndBlock())+uint64(s.buffer.Capacity()),
-		)
+func (s *Sinker) adjustedEndBlock() (endBlock uint64) {
+	if s.blockRange == nil || s.blockRange.EndBlock() == nil {
+		return 0
 	}
 
-	return s.blockRange
+	endBlock = *s.blockRange.EndBlock()
+	if s.buffer != nil {
+		adjusted := endBlock + uint64(s.buffer.Capacity())
+		s.logger.Debug("adjusted request end block for buffer", zap.Uint64("initial", endBlock), zap.Uint64("adjusted", adjusted))
+		endBlock = adjusted
+	}
+	return
 }
 
 func (s *Sinker) doRequest(
@@ -378,20 +367,46 @@ func (s *Sinker) doRequest(
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreamsrpc.Response_Progress:
-			for _, module := range r.Progress.Modules {
-				ProgressMessageCount.Inc(module.Name)
 
-				if processedRanges := module.GetProcessedRanges(); processedRanges != nil {
-					latestEndBlock := uint64(0)
-					for _, processedRange := range processedRanges.ProcessedRanges {
-						if processedRange.EndBlock > latestEndBlock {
-							latestEndBlock = processedRange.EndBlock
+			msg := r.Progress
+			var totalProcessedBlocks uint64
+
+			latestEndBlockPerStage := make(map[uint32]uint64)
+			jobsPerStage := make(map[uint32]uint64)
+
+			for _, j := range msg.RunningJobs {
+				totalProcessedBlocks += j.ProcessedBlocks
+				jobEndBlock := j.StartBlock + j.ProcessedBlocks
+				if prevEndBlock, ok := latestEndBlockPerStage[j.Stage]; !ok || jobEndBlock > prevEndBlock {
+					latestEndBlockPerStage[j.Stage] = jobEndBlock
+				}
+				jobsPerStage[j.Stage]++
+			}
+			for k, val := range latestEndBlockPerStage {
+				ProgressMessageLastBlock.SetUint64(val, stageString(k))
+			}
+			for k, val := range jobsPerStage {
+				ProgressMessageRunningJobs.SetUint64(val, stageString(k))
+			}
+
+			stagesModules := make(map[int][]string)
+			for i, stage := range msg.Stages {
+				stagesModules[i] = stage.Modules
+				for j, r := range stage.CompletedRanges {
+					if s.mode == SubstreamsModeProduction && i == len(msg.Stages)-1 { // last stage in production is a mapper. There may be "completed ranges" below the one that includes our start_block
+						if s.requestActiveStartBlock <= r.StartBlock && r.EndBlock >= s.requestActiveStartBlock {
+							ProgressMessageLastContiguousBlock.SetUint64(r.EndBlock, stageString(uint32(i)))
+						}
+					} else {
+						if j == 0 {
+							ProgressMessageLastContiguousBlock.SetUint64(r.EndBlock, stageString(uint32(i)))
 						}
 					}
-
-					ProgressMessageLastEndBlock.SetUint64(latestEndBlock, module.Name)
+					totalProcessedBlocks += (r.EndBlock - r.StartBlock)
 				}
 			}
+
+			ProgressMessageTotalProcessedBlocks.SetUint64(totalProcessedBlocks)
 
 			if s.tracer.Enabled() {
 				s.logger.Debug("received response Progress", zap.Reflect("progress", r))
@@ -497,12 +512,17 @@ func (s *Sinker) doRequest(
 				zap.Uint64("resolved_start_block", r.Session.ResolvedStartBlock),
 				zap.String("trace_id", r.Session.TraceId),
 			)
+			s.requestActiveStartBlock = r.Session.ResolvedStartBlock
 
 		default:
 			s.logger.Info("received unknown type of message", zap.Reflect("message", r))
 			UnknownMessageCount.Inc()
 		}
 	}
+}
+
+func stageString(i uint32) string {
+	return fmt.Sprintf("stage %d", i)
 }
 
 func retryable(err error) error {

@@ -34,7 +34,7 @@ func ReadManifestAndModule(
 ) {
 	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPath))
 
-	var opts []manifest.Options
+	var opts []manifest.Option
 	if skipPackageValidation {
 		opts = append(opts, manifest.SkipPackageValidationReader())
 	}
