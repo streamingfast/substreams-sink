@@ -470,7 +470,7 @@ func (s *Sinker) doRequest(
 				}
 
 				if err := handler.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("handle BlockScopedData message: %w", err)
+					return activeCursor, receivedMessage, fmt.Errorf("handle BlockScopedData message at block %s: %w", block, err)
 				}
 			}
 
