@@ -199,6 +199,15 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	lastCursor, err := s.run(ctx, cursor, handler)
 	if err == nil {
 		s.logger.Info("substreams ended correctly, reached your stop block", zap.Stringer("last_block_seen", lastCursor.Block()))
+
+		if v, ok := handler.(SinkerCompletionHandler); ok {
+			s.logger.Info("substreams handler has completion callback defined, calling it")
+
+			if err := v.HandleBlockRangeCompletion(ctx, lastCursor); err != nil {
+				s.Shutdown(fmt.Errorf("sinker completion handler error: %w", err))
+				return
+			}
+		}
 	}
 
 	// If the context is canceled and we are here, it we have stop running without any other error, so Shutdown without error,

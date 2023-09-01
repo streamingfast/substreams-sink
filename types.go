@@ -63,6 +63,22 @@ type SinkerHandler interface {
 	HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error
 }
 
+// SinkerCompletionHandler defines an extra interface that can be implemented on top of `SinkerHandler` where the
+// callback will be invoked when the sinker is done processing the requested range. This is useful to implement
+// a checkpointing mechanism where when the range has correctly fully processed, you can do something meaningful.
+type SinkerCompletionHandler interface {
+	// HandleBlockRangeCompletion is called when the sinker is done processing the requested range, only when
+	// the stream has correctly reached its end block. If the sinker is configured to stream live, this callback
+	// will never be called.
+	//
+	// If the sinker terminates with an error, this callback will not be called.
+	//
+	// The handler receives the following arguments:
+	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
+	// - `cursor` is the cursor at the given block, this cursor should be saved regularly as a checkpoint in case the process is interrupted.
+	HandleBlockRangeCompletion(ctx context.Context, cursor *Cursor) error
+}
+
 type Cursor struct {
 	*bstream.Cursor
 }
