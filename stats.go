@@ -12,8 +12,9 @@ import (
 type Stats struct {
 	*shutter.Shutter
 
-	dataMsgRate *dmetrics.AvgRatePromCounter
-	undoMsgRate *dmetrics.AvgRatePromCounter
+	dataMsgRate     *dmetrics.AvgRatePromCounter
+	progressMsgRate *dmetrics.AvgRatePromCounter
+	undoMsgRate     *dmetrics.AvgRatePromCounter
 
 	lastBlock bstream.BlockRef
 	logger    *zap.Logger
@@ -23,9 +24,11 @@ func newStats(logger *zap.Logger) *Stats {
 	return &Stats{
 		Shutter: shutter.New(),
 
-		dataMsgRate: dmetrics.MustNewAvgRateFromPromCounter(DataMessageCount, 1*time.Second, 30*time.Second, "msg"),
-		undoMsgRate: dmetrics.MustNewAvgRateFromPromCounter(UndoMessageCount, 1*time.Second, 30*time.Second, "msg"),
-		lastBlock:   unsetBlockRef{},
+		dataMsgRate:     dmetrics.MustNewAvgRateFromPromCounter(DataMessageCount, 1*time.Second, 30*time.Second, "msg"),
+		progressMsgRate: dmetrics.MustNewAvgRateFromPromCounter(ProgressMessageCount, 1*time.Second, 30*time.Second, "msg"),
+		undoMsgRate:     dmetrics.MustNewAvgRateFromPromCounter(UndoMessageCount, 1*time.Second, 30*time.Second, "msg"),
+
+		lastBlock: unsetBlockRef{},
 
 		logger: logger,
 	}
@@ -67,6 +70,8 @@ func (s *Stats) LogNow() {
 		zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
 
 		zap.Stringer("undo_msg_rate", s.undoMsgRate),
+		zap.Stringer("progress_msg_rate", s.progressMsgRate),
+
 		zap.Stringer("last_block", s.lastBlock),
 	)
 }
