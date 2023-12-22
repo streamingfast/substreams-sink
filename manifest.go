@@ -21,7 +21,8 @@ import (
 // If skipPackageValidation is set to true, the sink will not validate the package, you will have to do it yourself.
 func ReadManifestAndModule(
 	manifestPath string,
-	params []string,
+	network string,
+	paramsStrings []string,
 	outputModuleName string,
 	expectedOutputModuleType string,
 	skipPackageValidation bool,
@@ -38,24 +39,21 @@ func ReadManifestAndModule(
 	if skipPackageValidation {
 		opts = append(opts, manifest.SkipPackageValidationReader())
 	}
+	opts = append(opts, manifest.WithOverrideNetwork(network))
+	params, err := manifest.ParseParams(paramsStrings)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	opts = append(opts, manifest.WithParams(params))
 
 	reader, err := manifest.NewReader(manifestPath, opts...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("manifest reader %q: %w", manifestPath, err)
 	}
 
-	pkg, err = reader.Read()
+	pkg, graph, err := reader.Read()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
-
-	if err := manifest.ApplyParams(params, pkg); err != nil {
-		return nil, nil, nil, fmt.Errorf("apply params: %w", err)
-	}
-
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("create substreams module graph: %w", err)
 	}
 
 	resolvedOutputModuleName := outputModuleName
@@ -100,6 +98,7 @@ func ReadManifestAndModule(
 // ReadManifestAndModuleAndBlockRange acts exactly like ReadManifestAndModule but also reads the block range.
 func ReadManifestAndModuleAndBlockRange(
 	manifestPath string,
+	network string,
 	params []string,
 	outputModuleName string,
 	expectedOutputModuleType string,
@@ -113,7 +112,7 @@ func ReadManifestAndModuleAndBlockRange(
 	resolvedBlockRange *bstream.Range,
 	err error,
 ) {
-	pkg, module, outputModuleHash, err = ReadManifestAndModule(manifestPath, params, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
+	pkg, module, outputModuleHash, err = ReadManifestAndModule(manifestPath, network, params, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
 	if err != nil {
 		err = fmt.Errorf("read manifest and module: %w", err)
 		return

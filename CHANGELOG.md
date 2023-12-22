@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+* Added '--network' flag and handling
+
 ## v0.3.2
 
 * It's now possible to define on your handler the method `HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error` which will be called back when the `sink.Sinker` instance fully completed the request block range (infinite streaming or terminate because of an error does not trigger it).

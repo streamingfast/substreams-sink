@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	FlagNetwork               = "network"
 	FlagParams                = "params"
 	FlagInsecure              = "insecure"
 	FlagPlaintext             = "plaintext"
@@ -73,6 +74,10 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 
 	if flagIncluded(FlagParams) {
 		flags.StringArrayP(FlagParams, "p", nil, "Set a params for parameterizable modules of the from `-p <module>=<value>`, can be specified multiple times (e.g. -p module1=valA -p module2=valX&valY)")
+	}
+
+	if flagIncluded(FlagNetwork) {
+		flags.StringP(FlagNetwork, "n", "", "Specify network, overriding the default one in the manifest or .spkg")
 	}
 
 	if flagIncluded(FlagInsecure) {
@@ -139,12 +144,13 @@ func NewFromViper(
 	tracer logging.Tracer,
 	opts ...Option,
 ) (*Sinker, error) {
-	params, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, extraHeaders := getViperFlags(cmd)
+	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, extraHeaders := getViperFlags(cmd)
 
 	zlog.Info("sinker from CLI",
 		zap.String("endpoint", endpoint),
 		zap.String("manifest_path", manifestPath),
 		zap.Strings("params", params),
+		zap.String("network", network),
 		zap.String("output_module_name", outputModuleName),
 		zap.Stringer("expected_module_type", expectedModuleType(expectedOutputModuleType)),
 		zap.String("block_range", blockRange),
@@ -159,6 +165,7 @@ func NewFromViper(
 
 	pkg, module, outputModuleHash, resolvedBlockRange, err := ReadManifestAndModuleAndBlockRange(
 		manifestPath,
+		network,
 		params,
 		outputModuleName,
 		expectedOutputModuleType,
@@ -229,6 +236,7 @@ func NewFromViper(
 
 func getViperFlags(cmd *cobra.Command) (
 	params []string,
+	network string,
 	undoBufferSize int,
 	liveBlockTimeDelta time.Duration,
 	isDevelopmentMode bool,
@@ -239,6 +247,10 @@ func getViperFlags(cmd *cobra.Command) (
 ) {
 	if sflags.FlagDefined(cmd, FlagParams) {
 		params = sflags.MustGetStringArray(cmd, FlagParams)
+	}
+
+	if sflags.FlagDefined(cmd, FlagNetwork) {
+		network = sflags.MustGetString(cmd, FlagNetwork)
 	}
 
 	if sflags.FlagDefined(cmd, FlagUndoBufferSize) {
