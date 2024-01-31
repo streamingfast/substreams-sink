@@ -1,0 +1,6 @@
+go 1.21.5
+
+use .
+
+use ./examples/cli
+use ./examples/simplest
