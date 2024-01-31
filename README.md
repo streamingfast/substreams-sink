@@ -24,6 +24,13 @@ type BlockScopedDataHandler = func(ctx context.Context, cursor *Cursor, data *pb
 type BlockUndoSignalHandler = func(ctx context.Context, cursor *Cursor, undoSignal *pbsubstreamsrpc.BlockUndoSignal) error
 ```
 
+We invite you to take a look at our:
+- [Basic Example](./examples/basic/main.go) (and its accompanying [README.md](./examples/basic/README.md))
+- [Advanced Example](./examples/advanced/main.go) (and its accompanying [README.md](./examples/advanced/README.md))
+
+> [!NOTE]
+> We highly recommend to use the [Advanced Example](./examples/advanced/main.go) example for any serious sink implementation!
+
 ##### `BlockScopedDataHandler`
 
 * `ctx context.Context` is the `sink.Sinker` actual `context.Context`.
