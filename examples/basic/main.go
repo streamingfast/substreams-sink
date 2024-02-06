@@ -38,6 +38,8 @@ func main() {
 
 	pkg, outputModule, outputHashModule, blockRange, err := sink.ReadManifestAndModuleAndBlockRange(
 		manifestPath,
+		// Equivalent to the "network" parameter of the CLI. Specifies the network to use 
+		// for params and initialBlocks, overriding the "network" field in the Substreams package.
 		"mainnet",
 		params,
 		outputModuleName,
