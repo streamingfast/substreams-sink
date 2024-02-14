@@ -353,6 +353,10 @@ func ReadBlockRange(module *pbsubstreams.Module, input string) (*bstream.Range, 
 		start := module.InitialBlock
 		stop := resolveBlockNumber(beforeAsInt64, 0, beforeIsRelative, int64(start))
 
+		if int64(start) >= stop {
+			return nil, fmt.Errorf("invalid range: start block %d is equal or above stop block %d (exclusive)", start, stop)
+		}
+
 		return bstream.NewRangeExcludingEnd(start, uint64(stop)), nil
 	} else {
 		// Otherwise, we have a `:` sign so we assume it's a start/stop range

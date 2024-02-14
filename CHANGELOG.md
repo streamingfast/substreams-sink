@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-* Added '--network' flag and handling
+* Fixed a crash when providing a single block argument for block range if it's the same as the Substreams' start block.
+
+* Added `--network` flag and handling proper handling.
 
 ## v0.3.2
 
@@ -21,14 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Changed Prometheus Metrics
 
-* `substreams_sink_progress_message` removed in favor of `substreams_sink_progress_message_total_processed_blocks`
 * `substreams_sink_progress_message_last_end_block` removed in favor of `substreams_sink_progress_message_last_block` (per stage)
-
 
 #### Added Prometheus Metrics
 
-* added `substreams_sink_progress_message_last_contiguous_block` (per stage)
-* added `substreams_sink_progress_message_running_jobs`(per stage)
+* Added `substreams_sink_progress_message_total_processed_blocks`
+* Added `substreams_sink_progress_message_last_block`
+* Added `substreams_sink_progress_message_last_contiguous_block` (per stage)
+* Added `substreams_sink_progress_message_running_jobs`(per stage)
 
 ### Other changes
 
