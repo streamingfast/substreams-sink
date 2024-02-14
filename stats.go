@@ -12,9 +12,9 @@ import (
 type Stats struct {
 	*shutter.Shutter
 
-	dataMsgRate     *dmetrics.AvgRatePromCounter
-	progressMsgRate *dmetrics.AvgRatePromCounter
-	undoMsgRate     *dmetrics.AvgRatePromCounter
+	dataMsgRate       *dmetrics.AvgRatePromCounter
+	progressBlockRate *dmetrics.AvgRatePromGauge
+	undoMsgRate       *dmetrics.AvgRatePromCounter
 
 	lastBlock bstream.BlockRef
 	logger    *zap.Logger
@@ -24,9 +24,9 @@ func newStats(logger *zap.Logger) *Stats {
 	return &Stats{
 		Shutter: shutter.New(),
 
-		dataMsgRate:     dmetrics.MustNewAvgRateFromPromCounter(DataMessageCount, 1*time.Second, 30*time.Second, "msg"),
-		progressMsgRate: dmetrics.MustNewAvgRateFromPromCounter(ProgressMessageCount, 1*time.Second, 30*time.Second, "msg"),
-		undoMsgRate:     dmetrics.MustNewAvgRateFromPromCounter(UndoMessageCount, 1*time.Second, 30*time.Second, "msg"),
+		dataMsgRate:       dmetrics.MustNewAvgRateFromPromCounter(DataMessageCount, 1*time.Second, 30*time.Second, "msg"),
+		progressBlockRate: dmetrics.MustNewAvgRateFromPromGauge(ProgressMessageTotalProcessedBlocks, 1*time.Second, 30*time.Second, "block"),
+		undoMsgRate:       dmetrics.MustNewAvgRateFromPromCounter(UndoMessageCount, 1*time.Second, 30*time.Second, "msg"),
 
 		lastBlock: unsetBlockRef{},
 
@@ -64,13 +64,13 @@ func (s *Stats) LogNow() {
 	// them so the development logs looks nicer.
 	s.logger.Info("substreams stream stats",
 		zap.Stringer("data_msg_rate", s.dataMsgRate),
+		zap.Any("progress_block_rate", s.progressBlockRate),
+		zap.Stringer("undo_msg_rate", s.undoMsgRate),
+
 		zap.Any("progress_last_block", dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")),
 		zap.Any("progress_running_jobs", dmetrics.NewValuesFromMetric(ProgressMessageRunningJobs).Uints("stage")),
 		zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProgressMessageTotalProcessedBlocks, "blocks").ValueUint()),
 		zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
-
-		zap.Stringer("undo_msg_rate", s.undoMsgRate),
-		zap.Stringer("progress_msg_rate", s.progressMsgRate),
 
 		zap.Stringer("last_block", s.lastBlock),
 	)

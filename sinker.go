@@ -376,7 +376,6 @@ func (s *Sinker) doRequest(
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreamsrpc.Response_Progress:
-
 			msg := r.Progress
 			var totalProcessedBlocks uint64
 
@@ -415,6 +414,9 @@ func (s *Sinker) doRequest(
 				}
 			}
 
+			ProgressMessageCount.Inc()
+			// The returned value from the server gives an overview of the current progress and not the delta
+			// since the last message. Since the server is the source of truth, we just set the value directly.
 			ProgressMessageTotalProcessedBlocks.SetUint64(totalProcessedBlocks)
 
 			if s.tracer.Enabled() {
