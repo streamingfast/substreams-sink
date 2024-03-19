@@ -188,6 +188,7 @@ func NewFromViper(
 	clientConfig := client.NewSubstreamsClientConfig(
 		endpoint,
 		apiToken,
+		client.JWT,
 		sflags.MustGetBool(cmd, FlagInsecure),
 		sflags.MustGetBool(cmd, FlagPlaintext),
 	)
