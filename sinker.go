@@ -294,6 +294,11 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 				return activeCursor, nil
 			}
 
+			if ctxErr := ctx.Err(); errors.Is(ctxErr, context.Canceled) {
+				s.logger.Debug("substreams encountered an error but we are currently terminating, ignoring it", zap.Error(err))
+				return activeCursor, nil
+			}
+
 			// Retryable or not, we increment the error counter in all those cases
 			SubstreamsErrorCount.Inc()
 
