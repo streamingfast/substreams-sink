@@ -16,7 +16,7 @@ The library provides a `Sinker` class that can be used to connect to the Substre
 The user's primary responsibility when creating a custom sink is to pass a `BlockScopedDataHandler` and a `BlockUndoSignalHandler` implementation(s) which has the following interface:
 
 ```go
-impport (
+import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
