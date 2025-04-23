@@ -27,6 +27,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const defaultAgent = "substreams-sink/go-generic"
+
 // IgnoreOutputModuleType can be used instead of the expected output module type
 // when you want to validate this yourself, for example if you accept multiple
 // output type(s).
@@ -88,7 +90,7 @@ func New(
 		outputModuleHash: hex.EncodeToString(hash),
 		mode:             mode,
 		NoopMode:         NoopMode,
-		agent:            "substreams-sink/go-generic",
+		agent:            defaultAgent,
 		backOff:          bo,
 		stats:            newStats(logger),
 		logger:           logger,

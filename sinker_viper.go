@@ -211,7 +211,7 @@ func NewFromViper(
 		authType,
 		sflags.MustGetBool(cmd, FlagInsecure),
 		sflags.MustGetBool(cmd, FlagPlaintext),
-		"substreams-sink",
+		getSinkAgentOptionValue(opts),
 	)
 
 	mode := SubstreamsModeProduction
@@ -255,6 +255,21 @@ func NewFromViper(
 		tracer,
 		append(defaultSinkOptions, opts...)...,
 	)
+}
+
+// getSinkAgentOptionValue returns the value of the sink agent option from the provided options.
+// if no agent option is found, it returns the default agent value.
+func getSinkAgentOptionValue(options []Option) string {
+	sinker := Sinker{}
+	for _, opt := range options {
+		opt(&sinker)
+	}
+
+	if sinker.agent != "" {
+		return sinker.agent
+	}
+
+	return defaultAgent
 }
 
 func getViperFlags(cmd *cobra.Command) (
