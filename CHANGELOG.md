@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.5.1
 
+* Added `sink.WithAgent` option for usage in `sink.NewViper` to pass a custom agent string.
+
 * Bumped substreams to v1.15.2.
 
 ## v0.5.0
