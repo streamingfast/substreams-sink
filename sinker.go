@@ -58,6 +58,7 @@ type Sinker struct {
 	finalBlocksOnly bool
 	livenessChecker LivenessChecker
 	extraHeaders    []string
+	agent           string
 
 	// State
 	stats                   *Stats

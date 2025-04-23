@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bobg/go-generics/v2/slices"
+	"github.com/bobg/go-generics/v4/slices"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/bstream"
@@ -211,6 +211,7 @@ func NewFromViper(
 		authType,
 		sflags.MustGetBool(cmd, FlagInsecure),
 		sflags.MustGetBool(cmd, FlagPlaintext),
+		"substreams-sink",
 	)
 
 	mode := SubstreamsModeProduction

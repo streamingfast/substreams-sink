@@ -82,3 +82,12 @@ func WithExtraHeaders(headers []string) Option {
 		s.extraHeaders = headers
 	}
 }
+
+// WithAgent configures the [Sinker] instance to use a custom agent string when
+// connecting to the Substreams backend server. Otherwise, the default agent
+// string is used.
+func WithAgent(agent string) Option {
+	return func(s *Sinker) {
+		s.agent = agent
+	}
+}
