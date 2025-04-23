@@ -64,6 +64,8 @@ func sinkRunE(cmd *cobra.Command, args []string) error {
 		":",
 		zlog,
 		tracer,
+		// Use a unique agent name for your sink
+		sink.WithAgent("substreams-sink/example-advanced"),
 	)
 	cli.NoError(err, "unable to create sinker: %s", err)
 

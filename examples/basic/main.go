@@ -58,11 +58,13 @@ func main() {
 
 	sinker, err := sink.New(
 		sink.SubstreamsModeProduction,
+		false,
 		pkg,
 		outputModule,
 		outputHashModule,
 		// Deals with endpoint, API token and plaintext/TLS configuration
-		client.NewSubstreamsClientConfig(endpoint, os.Getenv("SUBSTREAMS_API_TOKEN"), client.JWT, false, false),
+		// Use a unique agent name for your sink
+		client.NewSubstreamsClientConfig(endpoint, os.Getenv("SUBSTREAMS_API_TOKEN"), client.JWT, false, false, "substreams-sink/example-basic"),
 		zlog,
 		tracer,
 		sink.WithBlockRange(blockRange),
