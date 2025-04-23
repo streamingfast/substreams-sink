@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 
@@ -88,6 +89,7 @@ func New(
 		outputModuleHash: hex.EncodeToString(hash),
 		mode:             mode,
 		NoopMode:         NoopMode,
+		agent:            "substreams-sink/go/" + genericAgentVersion(),
 		backOff:          bo,
 		stats:            newStats(logger),
 		logger:           logger,
@@ -585,4 +587,16 @@ func parseHeaders(headers []string) map[string]string {
 		result[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 	}
 	return result
+}
+
+type empty struct{}
+
+func genericAgentVersion() string {
+	// Possible values that I found that can happen on `PkgPath`:
+	// - github.com/streamingfast/substreams-sink when running from the examples, using `go.work` that points back to local path
+
+	pkgPath := reflect.TypeOf(empty{}).PkgPath()
+	fmt.Println("pkgPath", pkgPath)
+
+	return "v0.0.0"
 }
