@@ -367,6 +367,7 @@ func (s *Sinker) doRequest(
 	bool,
 	error,
 ) {
+	req.StartCursor = activeCursor.String()
 	s.logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
 	receivedMessage := false
 
@@ -499,7 +500,6 @@ func (s *Sinker) doRequest(
 						isLive = &liveBlock
 					}
 				}
-
 				if err := handler.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {
 					return activeCursor, receivedMessage, fmt.Errorf("handle BlockScopedData message at block %s: %w", block, err)
 				}
