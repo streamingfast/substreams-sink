@@ -61,10 +61,12 @@ type Sinker struct {
 	livenessChecker LivenessChecker
 	extraHeaders    []string
 	agent           string
+	idleTimeout 	time.Duration
 
 	// State
 	stats                   *Stats
 	requestActiveStartBlock uint64
+	lastDataMessageTime     time.Time
 }
 
 func New(
@@ -369,6 +371,7 @@ func (s *Sinker) doRequest(
 ) {
 	req.StartCursor = activeCursor.String()
 	s.logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
+	s.lastDataMessageTime = time.Time{}
 	receivedMessage := false
 
 	stream, err := ssClient.Blocks(ctx, req, callOpts...)
@@ -407,6 +410,17 @@ func (s *Sinker) doRequest(
 		switch r := resp.Message.(type) {
 		case *pbsubstreamsrpc.Response_Progress:
 			msg := r.Progress
+
+			if s.idleTimeout > 0 && !s.lastDataMessageTime.IsZero() {
+				idleTime := time.Since(s.lastDataMessageTime)
+				if idleTime > s.idleTimeout {
+					s.logger.Warn("no data messages received within idle timeout period, reconnecting",
+						zap.Duration("idle_timeout", s.idleTimeout),
+						zap.Duration("time_since_last_data", idleTime))
+					return activeCursor, receivedMessage, retryable(fmt.Errorf("idle timeout exceeded: %v since last data message", idleTime))
+				}
+			}
+
 			var totalProcessedBlocks uint64
 
 			latestEndBlockPerStage := make(map[uint32]uint64)
@@ -460,6 +474,8 @@ func (s *Sinker) doRequest(
 			if s.tracer.Enabled() {
 				s.logger.Debug("received response BlockScopedData", zap.Stringer("at", block), zap.String("module_name", moduleOutput.Name), zap.Int("payload_bytes", len(moduleOutput.MapOutput.Value)))
 			}
+
+			s.lastDataMessageTime = time.Now()
 
 			// We record our stats before the buffer action, so user sees state of "stream" and not state of buffer
 			s.stats.RecordBlock(block)
