@@ -66,7 +66,7 @@ type Sinker struct {
 	// State
 	stats                   *Stats
 	requestActiveStartBlock uint64
-	lastDataMessageTime     time.Time
+	lastMessageTime        	time.Time
 }
 
 func New(
@@ -371,7 +371,7 @@ func (s *Sinker) doRequest(
 ) {
 	req.StartCursor = activeCursor.String()
 	s.logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
-	s.lastDataMessageTime = time.Time{}
+	s.lastMessageTime = time.Now()
 	receivedMessage := false
 
 	stream, err := ssClient.Blocks(ctx, req, callOpts...)
@@ -384,7 +384,10 @@ func (s *Sinker) doRequest(
 			s.logger.Debug("substreams waiting to receive message", zap.Stringer("cursor", activeCursor))
 		}
 
-		resp, err := stream.Recv()
+		resp, err, timedOut := s.receiveWithTimeout(stream)
+		if timedOut {
+			return activeCursor, receivedMessage, err
+		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return activeCursor, receivedMessage, err
@@ -405,24 +408,14 @@ func (s *Sinker) doRequest(
 		}
 
 		receivedMessage = true
+		s.lastMessageTime = time.Now()
 		MessageSizeBytes.AddInt(proto.Size(resp))
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreamsrpc.Response_Progress:
 			msg := r.Progress
 
-			if s.idleTimeout > 0 && !s.lastDataMessageTime.IsZero() {
-				idleTime := time.Since(s.lastDataMessageTime)
-				if idleTime > s.idleTimeout {
-					s.logger.Warn("no data messages received within idle timeout period, reconnecting",
-						zap.Duration("idle_timeout", s.idleTimeout),
-						zap.Duration("time_since_last_data", idleTime))
-					return activeCursor, receivedMessage, retryable(fmt.Errorf("idle timeout exceeded: %v since last data message", idleTime))
-				}
-			}
-
 			var totalProcessedBlocks uint64
-
 			latestEndBlockPerStage := make(map[uint32]uint64)
 			jobsPerStage := make(map[uint32]uint64)
 
@@ -474,8 +467,6 @@ func (s *Sinker) doRequest(
 			if s.tracer.Enabled() {
 				s.logger.Debug("received response BlockScopedData", zap.Stringer("at", block), zap.String("module_name", moduleOutput.Name), zap.Int("payload_bytes", len(moduleOutput.MapOutput.Value)))
 			}
-
-			s.lastDataMessageTime = time.Now()
 
 			// We record our stats before the buffer action, so user sees state of "stream" and not state of buffer
 			s.stats.RecordBlock(block)
@@ -583,6 +574,42 @@ func stageString(i uint32) string {
 
 func retryable(err error) error {
 	return derr.NewRetryableError(err)
+}
+
+type recvResult struct {
+	resp *pbsubstreamsrpc.Response
+	err  error
+}
+
+// receiveWithTimeout receives a message from a stream with timeout handling.
+// returns the response, error, and a boolean indicating if the operation timed out.
+func (s *Sinker) receiveWithTimeout(
+	stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response],
+) (*pbsubstreamsrpc.Response, error, bool) {
+	recvCh := make(chan recvResult, 1)
+
+	// Start a goroutine to do the actual Recv call, which might block indefinitely
+	go func() {
+		resp, err := stream.Recv()
+		recvCh <- recvResult{resp, err}
+	}()
+
+	// Only setup timeout if idle timeout is enabled
+	var timeoutCh <-chan time.Time
+	if s.idleTimeout > 0 {
+		timeoutCh = time.After(s.idleTimeout)
+	}
+
+	select {
+	case result := <-recvCh:
+		return result.resp, result.err, false
+	case <-timeoutCh:
+		idleTime := time.Since(s.lastMessageTime)
+		s.logger.Warn("no messages received within idle timeout period, forcing reconnection",
+			zap.Duration("idle_timeout", s.idleTimeout),
+			zap.Duration("time_since_last_message", idleTime))
+		return nil, retryable(fmt.Errorf("idle timeout exceeded: %v since last message", idleTime)), true
+	}
 }
 
 var (
