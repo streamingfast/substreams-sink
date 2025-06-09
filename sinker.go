@@ -580,24 +580,27 @@ type recvResult struct {
 func (s *Sinker) receiveWithTimeout(
 	stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response],
 ) (*pbsubstreamsrpc.Response, error) {
-	recvCh := make(chan recvResult, 1)
+	if s.idleTimeout <= 0 {
+		return stream.Recv()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.idleTimeout)
+	defer cancel()
 
-	// Start a goroutine to do the actual Recv call, which might block indefinitely
+	recvCh := make(chan recvResult, 1)
 	go func() {
 		resp, err := stream.Recv()
-		recvCh <- recvResult{resp, err}
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			recvCh <- recvResult{resp, err}
+		}
 	}()
-
-	// Only setup timeout if idle timeout is enabled
-	var timeoutCh <-chan time.Time
-	if s.idleTimeout > 0 {
-		timeoutCh = time.After(s.idleTimeout)
-	}
 
 	select {
 	case result := <-recvCh:
 		return result.resp, result.err
-	case <-timeoutCh:
+	case <-ctx.Done():
 		return nil, retryable(fmt.Errorf("idle timeout exceeded: no message received within %v", s.idleTimeout))
 	}
 }
