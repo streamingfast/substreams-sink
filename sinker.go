@@ -382,7 +382,7 @@ func (s *Sinker) doRequest(
 			s.logger.Debug("substreams waiting to receive message", zap.Stringer("cursor", activeCursor))
 		}
 
-		resp, err := s.receiveWithTimeout(stream)
+		resp, err := receiveWithTimeout(stream, s.idleTimeout)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return activeCursor, receivedMessage, err
@@ -570,21 +570,24 @@ func retryable(err error) error {
 	return derr.NewRetryableError(err)
 }
 
-type recvResult struct {
-	resp *pbsubstreamsrpc.Response
-	err  error
-}
+// receiveWithTimeout is a generic helper to receive a message from any gRPC stream with timeout handling.
+// R represents the response type that will be returned by the stream.
+func receiveWithTimeout[R any](
+	stream interface{ Recv() (R, error) },
+	timeout time.Duration,
+) (R, error) {
+	var zero R
 
-// receiveWithTimeout receives a message from a stream with timeout handling.
-// returns the response and error (which may indicate a timeout).
-func (s *Sinker) receiveWithTimeout(
-	stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response],
-) (*pbsubstreamsrpc.Response, error) {
-	if s.idleTimeout <= 0 {
+	if timeout <= 0 {
 		return stream.Recv()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), s.idleTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	type recvResult struct {
+		resp R
+		err  error
+	}
 
 	recvCh := make(chan recvResult, 1)
 	go func() {
@@ -601,7 +604,7 @@ func (s *Sinker) receiveWithTimeout(
 	case result := <-recvCh:
 		return result.resp, result.err
 	case <-ctx.Done():
-		return nil, retryable(fmt.Errorf("idle timeout exceeded: no message received within %v", s.idleTimeout))
+		return zero, fmt.Errorf("idle timeout exceeded: no message received within %v", timeout)
 	}
 }
 
