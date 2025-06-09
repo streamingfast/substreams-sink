@@ -382,10 +382,7 @@ func (s *Sinker) doRequest(
 			s.logger.Debug("substreams waiting to receive message", zap.Stringer("cursor", activeCursor))
 		}
 
-		resp, err, timedOut := s.receiveWithTimeout(stream)
-		if timedOut {
-			return activeCursor, receivedMessage, err
-		}
+		resp, err := s.receiveWithTimeout(stream)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return activeCursor, receivedMessage, err
@@ -579,10 +576,10 @@ type recvResult struct {
 }
 
 // receiveWithTimeout receives a message from a stream with timeout handling.
-// returns the response, error, and a boolean indicating if the operation timed out.
+// returns the response and error (which may indicate a timeout).
 func (s *Sinker) receiveWithTimeout(
 	stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response],
-) (*pbsubstreamsrpc.Response, error, bool) {
+) (*pbsubstreamsrpc.Response, error) {
 	recvCh := make(chan recvResult, 1)
 
 	// Start a goroutine to do the actual Recv call, which might block indefinitely
@@ -599,11 +596,9 @@ func (s *Sinker) receiveWithTimeout(
 
 	select {
 	case result := <-recvCh:
-		return result.resp, result.err, false
+		return result.resp, result.err
 	case <-timeoutCh:
-		s.logger.Warn("stream.Recv() exceeded idle timeout, forcing reconnection",
-			zap.Duration("idle_timeout", s.idleTimeout))
-		return nil, retryable(fmt.Errorf("idle timeout exceeded: no message received within %v", s.idleTimeout)), true
+		return nil, retryable(fmt.Errorf("idle timeout exceeded: no message received within %v", s.idleTimeout))
 	}
 }
 
