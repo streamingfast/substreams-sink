@@ -119,6 +119,7 @@ func New(
 		zap.Bool("infinite_retry", s.infiniteRetry),
 		zap.Bool("final_blocks_only", s.finalBlocksOnly),
 		zap.Bool("liveness_checker", s.livenessChecker != nil),
+		zap.Duration("idle_timeout", s.idleTimeout),
 	)
 
 	return s, nil
