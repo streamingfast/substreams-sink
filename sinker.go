@@ -66,7 +66,6 @@ type Sinker struct {
 	// State
 	stats                   *Stats
 	requestActiveStartBlock uint64
-	lastMessageTime        	time.Time
 }
 
 func New(
@@ -371,7 +370,6 @@ func (s *Sinker) doRequest(
 ) {
 	req.StartCursor = activeCursor.String()
 	s.logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
-	s.lastMessageTime = time.Now()
 	receivedMessage := false
 
 	stream, err := ssClient.Blocks(ctx, req, callOpts...)
@@ -408,7 +406,6 @@ func (s *Sinker) doRequest(
 		}
 
 		receivedMessage = true
-		s.lastMessageTime = time.Now()
 		MessageSizeBytes.AddInt(proto.Size(resp))
 
 		switch r := resp.Message.(type) {
@@ -604,11 +601,9 @@ func (s *Sinker) receiveWithTimeout(
 	case result := <-recvCh:
 		return result.resp, result.err, false
 	case <-timeoutCh:
-		idleTime := time.Since(s.lastMessageTime)
-		s.logger.Warn("no messages received within idle timeout period, forcing reconnection",
-			zap.Duration("idle_timeout", s.idleTimeout),
-			zap.Duration("time_since_last_message", idleTime))
-		return nil, retryable(fmt.Errorf("idle timeout exceeded: %v since last message", idleTime)), true
+		s.logger.Warn("stream.Recv() exceeded idle timeout, forcing reconnection",
+			zap.Duration("idle_timeout", s.idleTimeout))
+		return nil, retryable(fmt.Errorf("idle timeout exceeded: no message received within %v", s.idleTimeout)), true
 	}
 }
 
