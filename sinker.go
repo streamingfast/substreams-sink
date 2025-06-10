@@ -409,8 +409,8 @@ func (s *Sinker) doRequest(
 		switch r := resp.Message.(type) {
 		case *pbsubstreamsrpc.Response_Progress:
 			msg := r.Progress
-
 			var totalProcessedBlocks uint64
+
 			latestEndBlockPerStage := make(map[uint32]uint64)
 			jobsPerStage := make(map[uint32]uint64)
 

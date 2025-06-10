@@ -95,7 +95,7 @@ func WithAgent(agent string) Option {
 }
 
 // WithIdleTimeout configures the [Sinker] instance to automatically
-// reconnect if no data messages are received within the specified duration.
+// reconnect if no gRPC messages are received within the specified duration.
 // Pass 0 to disable this feature (the default behavior).
 func WithIdleTimeout(timeout time.Duration) Option {
 	return func(s *Sinker) {
