@@ -577,8 +577,6 @@ func receiveWithTimeout[R any](
 	stream interface{ Recv() (R, error) },
 	timeout time.Duration,
 ) (R, error) {
-	var zero R
-
 	if timeout <= 0 {
 		return stream.Recv()
 	}
@@ -605,6 +603,7 @@ func receiveWithTimeout[R any](
 	case result := <-recvCh:
 		return result.resp, result.err
 	case <-ctx.Done():
+		var zero R
 		return zero, fmt.Errorf("idle timeout exceeded: no message received within %v", timeout)
 	}
 }
