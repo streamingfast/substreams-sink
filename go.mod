@@ -1,8 +1,6 @@
 module github.com/streamingfast/substreams-sink
 
-go 1.23.4
-
-toolchain go1.24.2
+go 1.24.2
 
 require (
 	github.com/bobg/go-generics/v4 v4.1.2
@@ -14,8 +12,8 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20240214191810-524a5c58fbaa
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams v1.15.2
-	go.uber.org/zap v1.26.0
+	github.com/streamingfast/substreams v1.15.10
+	go.uber.org/zap v1.27.0
 )
 
 require (
@@ -35,6 +33,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/bobg/go-generics/v3 v3.5.0 // indirect
+	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.2 // indirect
 	github.com/chzyer/readline v1.5.0 // indirect
@@ -55,6 +54,7 @@ require (
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
+	github.com/pinax-network/graph-networks-libs/packages/golang v0.7.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/schollz/closestmatch v2.1.0+incompatible // indirect
@@ -64,7 +64,8 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/dstore v0.1.1-0.20250217165048-d508dcc6b33e // indirect
+	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee // indirect
+	github.com/streamingfast/firehose-networks v0.2.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	github.com/zeebo/errs v1.4.0 // indirect

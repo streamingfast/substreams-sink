@@ -413,8 +413,8 @@ func (s *Sinker) doRequest(
 			jobsPerStage := make(map[uint32]uint64)
 
 			for _, j := range msg.RunningJobs {
-				totalProcessedBlocks += j.ProcessedBlocks
-				jobEndBlock := j.StartBlock + j.ProcessedBlocks
+				totalProcessedBlocks += j.ProgressBlocks
+				jobEndBlock := j.StartBlock + j.ProgressBlocks
 				if prevEndBlock, ok := latestEndBlockPerStage[j.Stage]; !ok || jobEndBlock > prevEndBlock {
 					latestEndBlockPerStage[j.Stage] = jobEndBlock
 				}
