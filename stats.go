@@ -60,20 +60,33 @@ func (s *Stats) Start(each time.Duration) {
 
 func (s *Stats) LogNow() {
 
-	// Logging fields order is important as it affects the final rendering, we carefully ordered
-	// them so the development logs looks nicer.
-	s.logger.Info("substreams stream stats",
+	var runningFromTier1 bool
+	var highestContiguousBlock uint64
+	for _, val := range dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage") {
+		if val > highestContiguousBlock {
+			highestContiguousBlock = val
+		}
+	}
+	if s.lastBlock.Num() > highestContiguousBlock {
+		runningFromTier1 = true
+	}
+	args := []zap.Field{
 		zap.Stringer("data_msg_rate", s.dataMsgRate),
-		zap.Any("progress_block_rate", s.progressBlockRate),
 		zap.Stringer("undo_msg_rate", s.undoMsgRate),
-
-		zap.Any("progress_last_block", dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")),
-		zap.Any("progress_running_jobs", dmetrics.NewValuesFromMetric(ProgressMessageRunningJobs).Uints("stage")),
-		zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProgressMessageTotalProcessedBlocks, "blocks").ValueUint()),
-		zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
-
 		zap.Stringer("last_block", s.lastBlock),
-	)
+	}
+
+	if runningFromTier1 {
+		args = append(args,
+			zap.Any("progress_last_block", dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")),
+			zap.Any("progress_running_jobs", dmetrics.NewValuesFromMetric(ProgressMessageRunningJobs).Uints("stage")),
+			zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProgressMessageTotalProcessedBlocks, "blocks").ValueUint()),
+			zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
+			zap.Any("progress_block_rate", s.progressBlockRate),
+		)
+	}
+	s.logger.Info("substreams stream stats", args...)
+
 }
 
 func (s *Stats) Close() {
