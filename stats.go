@@ -76,13 +76,18 @@ func (s *Stats) LogNow() {
 		zap.Stringer("last_block", s.lastBlock),
 	}
 
-	if runningFromTier1 {
+	if !runningFromTier1 {
 		args = append(args,
+			zap.Bool("live", false),
 			zap.Any("progress_last_block", dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")),
 			zap.Any("progress_running_jobs", dmetrics.NewValuesFromMetric(ProgressMessageRunningJobs).Uints("stage")),
 			zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProgressMessageTotalProcessedBlocks, "blocks").ValueUint()),
 			zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
 			zap.Any("progress_block_rate", s.progressBlockRate),
+		)
+	} else {
+		args = append(args,
+			zap.Bool("live", true),
 		)
 	}
 	s.logger.Info("substreams stream stats", args...)
