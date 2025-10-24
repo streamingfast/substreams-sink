@@ -88,6 +88,6 @@ func WithExtraHeaders(headers []string) Option {
 // string is used.
 func WithAgent(agent string) Option {
 	return func(s *Sinker) {
-		s.agent = agent
+		s.clientConfig.SetAgent(agent)
 	}
 }

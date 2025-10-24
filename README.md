@@ -2,6 +2,11 @@
 
 This is a Substreams Sink library. You can use to build any sink application that consumes Substreams in Golang
 
+> [!IMPORTANT]
+> This library is now deprecated and will not be maintained anymore. The sink library has been merged inside
+> Substreams main project directly, see [README](https://github.com/streamingfast/substreams/blob/develop/sink/README.md) for
+> the new home of this project and check the [MIGRATION guide](https://github.com/streamingfast/substreams/blob/develop/sink/MIGRATION.md) for moving from `github.com/streamingfast/substreams-sink` to `github.com/streamingfast/substreams/sink`.
+
 ### Features
 What you get by using this library:
 

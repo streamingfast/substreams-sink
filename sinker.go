@@ -19,6 +19,7 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -60,7 +61,6 @@ type Sinker struct {
 	finalBlocksOnly bool
 	livenessChecker LivenessChecker
 	extraHeaders    []string
-	agent           string
 
 	// State
 	stats                   *Stats
@@ -90,11 +90,14 @@ func New(
 		outputModuleHash: hex.EncodeToString(hash),
 		mode:             mode,
 		NoopMode:         NoopMode,
-		agent:            defaultAgent,
 		backOff:          bo,
 		stats:            newStats(logger),
 		logger:           logger,
 		tracer:           tracer,
+	}
+
+	if s.clientConfig.Agent() == "" {
+		s.clientConfig.SetAgent(defaultAgent)
 	}
 
 	for _, opt := range opts {
@@ -234,7 +237,8 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler) (activeCursor *Cursor, err error) {
 	activeCursor = cursor
 
-	ssClient, closeFunc, callOpts, headers, err := client.NewSubstreamsClient(s.clientConfig)
+	ssClientConn, closeFunc, callOpts, headers, err := client.NewSubstreamsClientConn(s.clientConfig)
+	ssClient := pbsubstreamsrpcv2.NewStreamClient(ssClientConn)
 
 	if err != nil {
 		return activeCursor, fmt.Errorf("new substreams client: %w", err)

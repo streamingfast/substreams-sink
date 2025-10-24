@@ -205,14 +205,14 @@ func NewFromViper(
 	auth := newAuthenticator(sflags.MustGetString(cmd, FlagAPIKeyEnvvar), sflags.MustGetString(cmd, FlagAPITokenEnvvar))
 	authToken, authType := auth.GetTokenAndType()
 
-	clientConfig := client.NewSubstreamsClientConfig(
-		endpoint,
-		authToken,
-		authType,
-		sflags.MustGetBool(cmd, FlagInsecure),
-		sflags.MustGetBool(cmd, FlagPlaintext),
-		getSinkAgentOptionValue(opts),
-	)
+	clientConfig := client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
+		Endpoint:  endpoint,
+		AuthToken: authToken,
+		AuthType:  authType,
+		Insecure:  sflags.MustGetBool(cmd, FlagInsecure),
+		PlainText: sflags.MustGetBool(cmd, FlagPlaintext),
+		Agent:     getSinkAgentOptionValue(opts),
+	})
 
 	mode := SubstreamsModeProduction
 	if isDevelopmentMode {
@@ -265,8 +265,8 @@ func getSinkAgentOptionValue(options []Option) string {
 		opt(&sinker)
 	}
 
-	if sinker.agent != "" {
-		return sinker.agent
+	if agent := sinker.clientConfig.Agent(); agent != "" {
+		return agent
 	}
 
 	return defaultAgent
