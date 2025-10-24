@@ -260,7 +260,9 @@ func NewFromViper(
 // getSinkAgentOptionValue returns the value of the sink agent option from the provided options.
 // if no agent option is found, it returns the default agent value.
 func getSinkAgentOptionValue(options []Option) string {
-	sinker := Sinker{}
+	sinker := Sinker{
+		clientConfig: &client.SubstreamsClientConfig{},
+	}
 	for _, opt := range options {
 		opt(&sinker)
 	}
