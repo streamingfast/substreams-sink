@@ -64,7 +64,14 @@ func main() {
 		outputHashModule,
 		// Deals with endpoint, API token and plaintext/TLS configuration
 		// Use a unique agent name for your sink
-		client.NewSubstreamsClientConfig(endpoint, os.Getenv("SUBSTREAMS_API_TOKEN"), client.JWT, false, false, "substreams-sink/example-basic"),
+		client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
+			Endpoint:  endpoint,
+			AuthToken: os.Getenv("SUBSTREAMS_API_TOKEN"),
+			AuthType:  client.JWT,
+			PlainText: false,
+			Insecure:  false,
+			Agent:     "substreams-sink/example-basic",
+		}),
 		zlog,
 		tracer,
 		sink.WithBlockRange(blockRange),

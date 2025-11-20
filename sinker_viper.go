@@ -93,7 +93,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagUndoBufferSize) {
-		flags.Int(FlagUndoBufferSize, 12, "Number of blocks to keep buffered to handle fork reorganizations")
+		flags.Int(FlagUndoBufferSize, 0, "Number of blocks to keep buffered (this creates a delay of X blocks when consuming live data -- use this if you want to avoid handling fork reorganizations in your sink)")
 	}
 
 	if flagIncluded(FlagLiveBlockTimeDelta) {
